@@ -101,8 +101,9 @@ Splits this many of the MATs into 2.''')
             else:
                 with open('result.csv', 'w', encoding='utf-16') as resultsfile:
                     print('Writing results to file...')
-                    writer = csv.DictWriter(resultsfile,
-                    fieldnames=['MAT', ] + sorted(list(itertools.chain.from_iterable(['Average ' + x, 'Subject ' + x] for x in defs.ProgressScoreHeaders))))
+                    chain = itertools.chain.from_iterable
+                    fields = sorted(list(chain(['Average ' + x, 'Subject ' + x] for x in defs.ProgressScoreHeaders)))
+                    writer = csv.DictWriter(resultsfile, fieldnames=['MAT', ] + fields)
                     writer.writeheader()
                     writer.writerows([{**{'MAT': x[0]}, **x[1][0], **x[1][1]} for x in results])
                     print('Done!')
@@ -150,49 +151,55 @@ Splits this many of the MATs into 2.''')
             writer.writerows(NewDicts)
         return list(x + '1' for x in retChangeMATS.keys())
 
+    def experimentalfunc():
+        testeds = testprep(args.plural)
+        go = 0
+        ensure_dir('special/testresults/result.csv')
+        with open('special/testresults/result.csv', 'w', encoding='utf-16') as resultsfile:
+            writer = csv.DictWriter(resultsfile, fieldnames=['a', 'b', 'c', 'd', 'e', 'position', 'score', 'MAT'])
+            writer.writeheader()
+            dictstobewritten = []
+            algorithm = defs.TestAlgorithmMaker((tuple(x)[0] for x in defs.TestAlgorithmVariables))
+            importkeys = []
+            for a, b in zip(algorithm[:-3:4], algorithm[1:-2:4]):
+                importkeys += [a, b]
+            table = importer(importkeys, testing=True)
+            if table[1]:
+                MATs.purge_table(table[0])
+            for var in product(defs.TestAlgorithmVariables):
+                go += 1
+                algorithm = defs.TestAlgorithmMaker(var)
+                results = doit(algorithm, testeds, 1, testing=True)
+                print('\nTry {}'.format(go))
+                print(algorithm)
+                for resulthing in results:
+                    pprint(resulthing[0])
+                    done = False
+                    for pos, thing in enumerate(resulthing[1]):
+                        if thing[0].startswith(resulthing[0][:-1]) and thing[0].endswith('2'):
+                            dicttobewritten = {'a': var[0], 'b': var[1], 'c': var[2], 'd': var[3], 'e': var[4],
+                                               'position': pos, 'score': thing[1], 'MAT': thing[0]}
+                            done = True
+                            break
+                    if done:
+                        print(dicttobewritten)
+                        dictstobewritten.append(dicttobewritten)
+            writer.writerows(dictstobewritten)
+
+        print('\a')
+
+    def normfunc():
+        if args.All:
+                args.MATs = MATList()
+        elif type(args.algorithm) == str:
+            args.algorithm = shlexsplit(args.algorithm)
+        doit(args.algorithm, args.MATs, args.multi)
+
     if args.action != 'Purge':
         if args.action == 'Test':
-            testeds = testprep(args.plural)
-            go = 0
-            ensure_dir('special/testresults/result.csv')
-            with open('special/testresults/result.csv', 'w', encoding='utf-16') as resultsfile:
-                writer = csv.DictWriter(resultsfile, fieldnames=['a', 'b', 'c', 'd', 'e', 'position', 'score', 'MAT'])
-                writer.writeheader()
-                dictstobewritten = []
-                algorithm = defs.TestAlgorithmMaker((tuple(x)[0] for x in defs.TestAlgorithmVariables))
-                importkeys = []
-                for a, b in zip(algorithm[:-3:4], algorithm[1:-2:4]):
-                    importkeys += [a, b]
-                table = importer(importkeys, testing=True)
-                if table[1]:
-                    MATs.purge_table(table[0])
-                for var in product(defs.TestAlgorithmVariables):
-                    go += 1
-                    algorithm = defs.TestAlgorithmMaker(var)
-                    results = doit(algorithm, testeds, 1, testing=True)
-                    print('\nTry {}'.format(go))
-                    print(algorithm)
-                    for resulthing in results:
-                        pprint(resulthing[0])
-                        done = False
-                        for pos, thing in enumerate(resulthing[1]):
-                            if thing[0].startswith(resulthing[0][:-1]) and thing[0].endswith('2'):
-                                dicttobewritten = {'a': var[0], 'b': var[1], 'c': var[2], 'd': var[3], 'e': var[4],
-                                                   'position': pos, 'score': thing[1], 'MAT': thing[0]}
-                                done = True
-                                break
-                        if done:
-                            print(dicttobewritten)
-                            dictstobewritten.append(dicttobewritten)
-                writer.writerows(dictstobewritten)
-
-            print('\a')
+            experimentalfunc()
         elif args.action == 'Similar':
-            if args.All:
-                args.MATs = MATList()
-            if type(args.algorithm) == str:
-                args.algorithm = shlexsplit(args.algorithm)
-            doit(args.algorithm, args.MATs, args.multi)
+            normfunc()
 
 
 main()
