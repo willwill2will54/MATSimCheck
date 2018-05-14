@@ -15,7 +15,6 @@ TestAlgorithmVariables = (range(4), ) * 5
 
 
 def TestAlgorithmMaker(variables):
-    variables = list(variables)
     algorithm = [
         'trust', 'size', 'wgt', str(variables[0]),
         'geo', 'rmsd', 'wgt', str(variables[1]),

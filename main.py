@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import sys
 import random
 import csv
@@ -21,9 +20,10 @@ _2 = os.path.dirname(_1)
 if _2 is not '':
     os.chdir(_2)
 
-
+# Gooey automatically generates a GUI
 @Gooey(program_name='MATSimCheck', image_dir='lib', monospace_display=True)
 def main():
+    # Open the databases
     noncore = TinyDB('./dbs/non_Core.json')
     MATs = TinyDB('./dbs/MATS.json')
     core = TinyDB('./dbs/Core.json')
@@ -159,16 +159,17 @@ Splits this many of the MATs into 2.''')
             writer = csv.DictWriter(resultsfile, fieldnames=['a', 'b', 'c', 'd', 'e', 'position', 'score', 'MAT'])
             writer.writeheader()
             dictstobewritten = []
-            algorithm = defs.TestAlgorithmMaker((tuple(x)[0] for x in defs.TestAlgorithmVariables))
+            algorithm = defs.TestAlgorithmMaker([list(x)[0] for x in defs.TestAlgorithmVariables])
             importkeys = []
             for a, b in zip(algorithm[:-3:4], algorithm[1:-2:4]):
                 importkeys += [a, b]
             table = importer(importkeys, testing=True)
             if table[1]:
                 MATs.purge_table(table[0])
-            for var in product(defs.TestAlgorithmVariables):
+            for var in product(*defs.TestAlgorithmVariables):
                 go += 1
                 algorithm = defs.TestAlgorithmMaker(var)
+                print(var)
                 results = doit(algorithm, testeds, 1, testing=True)
                 print('\nTry {}'.format(go))
                 print(algorithm)

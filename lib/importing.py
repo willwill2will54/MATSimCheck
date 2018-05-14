@@ -3,11 +3,12 @@ def importer(extras, testing=False):
     from tinydb import TinyDB, Query
     import progressbar as pbar
     import numpy as np
-    from random import shuffle
+    from random import shuffle, randint
     from lib.misc import getpostcodes
     import defaults as defs
     from collections import Counter
     from os import listdir
+    import threading
     widgets = [
         pbar.AnimatedMarker(markers='⣯⣟⡿⢿⣻⣽⣾⣷'),
         ' [', pbar.Percentage(), '] ',
@@ -53,7 +54,9 @@ def importer(extras, testing=False):
                         for i, x in enumerate(dicts):
                             urn = x['URN']
                             urns.append(urn)
-                            Mat_in = [core.upsert(x, Query().URN == urn), ]
+                            Mat_in = core.upsert(x, Query().URN == urn)
+                            if type(Mat_in) == int:
+                                Mat_in = [Mat_in, ]
                             try:
                                 search = table.search(Query()['Trust name'] == x[defs.MatNameKey])
                                 Mat_in.extend([x for x in search[0]['IDs']])
@@ -97,203 +100,236 @@ def importer(extras, testing=False):
         counties.purge()
         counties.insert_multiple(dicts)
 
+    threads = []
+
+    corelock = threading.Lock()
+    matlock = threading.Lock()
+    weblock = threading.Lock()
+
+    def submitchanged(changed):
+        for thang in changed:
+            table.update(thang, doc_ids=[thang.doc_id, ])
+        return []
+
+    class ThreadedProccessor(threading.Thread):
+        def __init__(self, function, name):
+            threading.Thread.__init__(self)
+            self.function = function
+            self.name = name
+
+        def run(self):
+            matlock.acquire()
+            mats = table.all()
+            matlock.release()
+            changed = []
+            rand = randint(30, 40)
+            matlen = len(mats)
+            for i, x in enumerate(mats):
+                changed.append(self.function(x))
+                if i % rand == 0:
+                    print('{} is {}% done'.format(self.name, int(i * 100 / matlen)))
+                    if matlock.acquire(blocking=False):
+                        changed = submitchanged(changed)
+                        matlock.release()
+            if changed != []:
+                matlock.acquire()
+                submitchanged(changed)
+                matlock.release()
+                print('{} is 100% done'.format(self.name))
+
     def lentest(t):
         return len(t) == 1
+
     table.remove(Query().IDs.test(lentest))
     Messages.PARGS()
-    with pbar.ProgressBar(max_value=len(table.all()) + 1, redirect_stdout=True, widgets=widgets) as bar:
-        global counter
-        counter = 0
 
-        def pricecheck(x):
-            global counter
-            counter += 1
-            bar.update(counter)
-            countieslist, nums, cords, postcodes = [], [], [], []
-            for ID in x['IDs']:
-                y = core.get(doc_id=ID)
-                if 'cord' in y:
-                    cords.append(y['cord'])
-                else:
-                    postcodes.append(y[defs.PostCodeKey])
-            cords2 = None
-            if postcodes != []:
-                    while True:
-                        try:
-                            cords2 = getpostcodes(postcodes)
-                            assert cords2 is not None
-                            break
-                        except Exception:
-                            Messages.WebTrouble()
-            if cords2 is not None:
-                    for cord in cords2:
-                        core.update({'cord': cord}, Query()[defs.PostCodeKey] == cord['postcode'])
-                    cords += cords2
-            for y in cords:
-                countieslist.append(y['codes']['admin_county'])
-            for y in countieslist:
-                try:
-                    z = counties.get(Query().CountyCode == y)
-                    nums.append(int(z['MedianHousePrice']))
-                except TypeError:
-                    pass
+
+    def pricecheck(x):
+        countieslist, nums, cords, postcodes = [], [], [], []
+        for ID in x['IDs']:
+            corelock.acquire()
+            y = core.get(doc_id=ID)
+            corelock.release()
+            if 'cord' in y:
+                cords.append(y['cord'])
+            else:
+                postcodes.append(y[defs.PostCodeKey])
+        cords2 = None
+        if postcodes != []:
+                weblock.acquire()
+                while True:
+                    try:
+                        cords2 = getpostcodes(postcodes)
+                        assert cords2 is not None
+                        break
+                    except Exception:
+                        Messages.WebTrouble()
+                weblock.release()
+        if cords2 is not None:
+                corelock.acquire()
+                for cord in cords2:
+                    core.update({'cord': cord}, Query()[defs.PostCodeKey] == cord['postcode'])
+                corelock.release()
+                cords += cords2
+        for y in cords:
+            countieslist.append(y['codes']['admin_county'])
+        for y in countieslist:
             try:
-                x['housepriceavg'] = np.average(np.array(nums))
+                z = counties.get(Query().CountyCode == y)
+                nums.append(int(z['MedianHousePrice']))
+            except TypeError:
+                pass
+        try:
+            x['housepriceavg'] = np.average(np.array(nums))
+        except Exception:
+            pass
+        return x
+
+    def sizecheck(x):
+            if 'trustsize' in x:
+                return x
+            x['trustsize'] = len(x['IDs'])
+            return x
+
+    def PCdist(x):
+            if 'geormsd' in x:
+                return x
+            IDs = x['IDs']
+            Postcodes = []
+            cords2 = []
+            for ID in IDs:
+                try:
+                    try:
+                        corelock.acquire()
+                        IDData = core.get(doc_id=ID)
+                        corelock.release()
+                    except TypeError:
+                        print(ID)
+                        raise
+                    if 'cord' in IDData:
+                        cords2.append(IDData['cord'])
+                    Postcodes.append((ID, IDData[defs.PostCodeKey]))
+                except KeyError:
+                    raise
+            if Postcodes != []:
+                weblock.acquire()
+                while True:
+                    try:
+                        cords3 = getpostcodes(Postcodes)
+                        assert cords3 is not None
+                        break
+                    except Exception:
+                        Messages.WebTrouble()
+                weblock.release()
+            if cords3 is not None:
+                corelock.acquire()
+                for cord in cords3:
+                    core.update({'cord': cord}, Query()[defs.PostCodeKey] == cord['postcode'])
+                corelock.release()
+                cords2 += cords3
+            cords = [(x['northings'], x['eastings']) for x in cords2]
+            cordsa = np.array(cords)
+            try:
+                rmsd = np.std(cordsa)
+                x['geormsd'] = rmsd
+            except OverflowError:
+                pass
             except Exception:
                 pass
             return x
 
-        def sizecheck(x):
-                global counter
-                counter += 1
-                bar.update(counter)
-                if 'trustsize' in x:
+    def operator(key, operation):
+        if operation == 'avg':
+            def avg(x, key):
+                if key + 'avg' in x:
                     return x
-                x['trustsize'] = len(x['IDs'])
+                nums = []
+                corelock.acquire()
+                for ID in x['IDs']:
+                    nums.append(float(core.get(doc_id=ID)[key]))
+                corelock.release()
+                try:
+                    x[key + 'avg'] = np.average(np.array(nums))
+                except Exception:
+                    pass
                 return x
-
-        def PCdist():
-                Messages.PCDIST()
-                thelist = table.all()
-                shuffle(thelist)
-                for i, x in enumerate(thelist):
-                    if 'geormsd' in x:
-                        continue
-                    bar.update(i)
-                    IDs = x['IDs']
-                    Postcodes = []
-                    cords2 = []
-                    for ID in IDs:
-                        try:
-                            try:
-                                IDData = core.get(doc_id=ID)
-                            except TypeError:
-                                print(ID)
-                                raise
-                            if 'cord' in IDData:
-                                cords2.append(IDData['cord'])
-                            Postcodes.append((ID, IDData[defs.PostCodeKey]))
-                        except KeyError:
-                            raise
-                    if Postcodes != []:
-                        while True:
-                            try:
-                                cords3 = getpostcodes(Postcodes)
-                                assert cords3 is not None
-                                break
-                            except Exception:
-                                Messages.WebTrouble()
-                                bar.update(i)
-                    if cords3 is not None:
-                        for cord in cords3:
-                            core.update({'cord': cord}, Query()[defs.PostCodeKey] == cord['postcode'])
-                        cords2 += cords3
-                    cords = [(x['northings'], x['eastings']) for x in cords2]
-                    cordsa = np.array(cords)
-                    try:
-                        rmsd = np.std(cordsa)
-                        table.update({'geormsd': rmsd}, doc_ids=[x.doc_id, ])
-                    except OverflowError:
-                        pass
-                    except Exception:
-                        pass
-
-        def operator(key, operation):
-            global counter
-            counter = 0
-            if operation == 'avg':
-                def avg(x, key):
-                    global counter
-                    counter += 1
-                    if key + 'avg' in x:
+            func = lambda t: avg(t, key)
+        elif operation == 'rmsd':
+            def rmsd(x, key):
+                if key + 'rmsd' in x:
+                    return x
+                array = np.array([])
+                nums = []
+                corelock.acquire()
+                for ID in x['IDs']:
+                    nums.append(float(core.get(doc_id=ID)[key]))
+                corelock.release()
+                array = np.append(array, nums)
+                try:
+                    x[key + 'rmsd'] = np.std(array)
+                except Exception:
+                    pass
+                return x
+            func = lambda t: rmsd(t, key)
+        elif operation == 'mode':
+            def mode(x, key):
+                if key + 'mode' in x:
+                    return x
+                corelock.acquire()
+                stuff = [core.get(doc_id=ID)[key] for ID in x['IDs']]
+                corelock.release()
+                x[key + 'mode'] = Counter(stuff).most_common(1)[0][0]
+                return x
+            func = lambda t: mode(t, key)
+        elif operation == 'rng':
+            def rng(x, key):
+                if key + 'rng' in x:
+                    return x
+                corelock.acquire()
+                stuff = [core.get(doc_id=ID)[key] for ID in x['IDs']]
+                corelock.release()
+                x[key + 'rng'] = max(stuff) - min(stuff)
+                return x
+            func = lambda t: rng(t, key)
+        elif operation == 'med':
+            def med(x, key):
+                try:
+                    if key + 'med' in x:
                         return x
-                    bar.update(counter)
                     nums = []
+                    corelock.acquire()
                     for ID in x['IDs']:
                         nums.append(float(core.get(doc_id=ID)[key]))
+                    corelock.release()
                     try:
-                        x[key + 'avg'] = np.average(np.array(nums))
+                        x[key + 'med'] = np.median(np.array(nums))
                     except Exception:
                         pass
-                    return x
-                func = lambda t: avg(t, key)
-            elif operation == 'rmsd':
-                def rmsd(x, key):
-                    global counter
-                    counter += 1
-                    if key + 'rmsd' in x:
-                        return x
-                    bar.update(counter)
-                    array = np.array([])
-                    nums = []
-                    for ID in x['IDs']:
-                        nums.append(float(core.get(doc_id=ID)[key]))
-                    array = np.append(array, nums)
-                    try:
-                        x[key + 'rmsd'] = np.std(array)
-                    except Exception:
-                        pass
-                    return x
-                func = lambda t: rmsd(t, key)
-            elif operation == 'mode':
-                def mode(x, key):
-                    global counter
-                    counter += 1
-                    if key + 'mode' in x:
-                        return x
-                    bar.update(counter)
-                    stuff = [core.get(doc_id=ID)[key] for ID in x['IDs']]
-                    x[key + 'mode'] = Counter(stuff).most_common(1)[0][0]
-                    return x
-                func = lambda t: mode(t, key)
-            elif operation == 'rng':
-                def rng(x, key):
-                    global counter
-                    counter += 1
-                    if key + 'rng' in x:
-                        return x
-                    bar.update(counter)
-                    stuff = [core.get(doc_id=ID)[key] for ID in x['IDs']]
-                    x[key + 'rng'] = max(stuff) - min(stuff)
-                    return x
-                func = lambda t: rng(t, key)
-            elif operation == 'med':
-                def med(x, key):
-                    try:
-                        global counter
-                        counter += 1
-                        if key + 'med' in x:
-                            return x
-                        bar.update(counter)
-                        nums = []
-                        for ID in x['IDs']:
-                            nums.append(float(core.get(doc_id=ID)[key]))
-                        try:
-                            x[key + 'med'] = np.median(np.array(nums))
-                        except Exception:
-                            pass
-                    except Exception:
-                        pass
-                    return x
-                func = lambda t: med(t, key)
-            return func
-        process = []
-        ops = ['avg', 'rmsd', 'med', 'rng', 'mode', 'size']
-        for y, z in zip(extras1[:-1:], extras1[1::]):
-            if z in ops:
-                process.append((y, z))
-        for x, y in process:
-            counter = 0
-            if (x, y) == ('geo', 'rmsd'):
-                PCdist()
-                continue
-            Messages.OpDeclare(y, x)
-            if (x, y) == ('trust', 'size'):
-                table.update(sizecheck)
-            elif (x, y) == ('houseprice', 'avg'):
-                table.update(pricecheck)
-            else:
-                table.update(operator(x, y))
+                except Exception:
+                    pass
+                return x
+            func = lambda t: med(t, key)
+        return func
+    process = []
+    ops = ['avg', 'rmsd', 'med', 'rng', 'mode', 'size']
+    for y, z in zip(extras1[:-1:], extras1[1::]):
+        if z in ops:
+            process.append((y, z))
+    for x, y in process:
+        if (x, y) == ('geo', 'rmsd'):
+            threads.append(ThreadedProccessor(PCdist, 'Finding {} of {}'.format(x, y)))
+            continue
+        Messages.OpDeclare(y, x)
+        if (x, y) == ('trust', 'size'):
+            threads.append(ThreadedProccessor(sizecheck, 'Finding {} of {}'.format(x, y)))
+        elif (x, y) == ('houseprice', 'avg'):
+            threads.append(ThreadedProccessor(pricecheck, 'Finding {} of {}'.format(x, y)))
+        else:
+            threads.append(ThreadedProccessor(operator(x, y), 'Finding {} of {}'.format(x, y)))
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
     for x in [noncore, MATs, core, counties]:
         x.close()
     print('\a')

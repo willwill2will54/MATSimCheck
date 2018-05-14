@@ -1,0 +1,6 @@
+
+*.pyc
+*.pyc
+*.pyc
+lib/__pycache__/testing.cpython-36.pyc
+lib/__pycache__/importing.cpython-36.pyc
