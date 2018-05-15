@@ -3,6 +3,7 @@ import random
 import csv
 from shlex import split as shlexsplit
 import os
+import lib.messages as msg
 from itertools import product
 from collections import Counter
 from tinydb import TinyDB
@@ -70,17 +71,16 @@ Splits this many of the MATs into 2.''')
     args = parser.parse_args()
 
     if args.action == 'Purge':
-        print("Purging all databases...")
+        msg.PURGE()
         for x in [core, noncore, counties, MATs]:
             x.purge()
         MATs.purge_tables()
-        time.sleep(1)
-        print('Done!')
+        msg.DONE()
 
     if args.action == 'Display':
         for x in MATs.tables():
             if not x == '_default':
-                print(x.replace('|', ' '))
+                print(x.replace('|', ' '), flush=True)
 
     def doit(algorithm, tested, num, testing=False):
         if algorithm in (None, ['defaults', ], 'defaults'):
@@ -91,22 +91,21 @@ Splits this many of the MATs into 2.''')
                 importkeys += [a, b]
             table = importer(importkeys, testing=testing)[0]
             results = []
-            print(table)
             for x in tested:
                 result = tester(x, table, algorithm=algorithm, number=num, testing=testing)
-                print('{} is most similar to {}'.format(x, ' then '.join(result[0])))
+                print('{} is most similar to {}'.format(x, ' then '.join(result[0])), flush=True)
                 results.append((x, result[1]))
             if testing:
                 return results
             else:
                 with open('result.csv', 'w', encoding='utf-16') as resultsfile:
-                    print('Writing results to file...')
+                    print('Writing results to file...', flush=True)
                     chain = itertools.chain.from_iterable
                     fields = sorted(list(chain(['Average ' + x, 'Subject ' + x] for x in defs.ProgressScoreHeaders)))
                     writer = csv.DictWriter(resultsfile, fieldnames=['MAT', ] + fields)
                     writer.writeheader()
                     writer.writerows([{**{'MAT': x[0]}, **x[1][0], **x[1][1]} for x in results])
-                    print('Done!')
+                    msg.DONE()
 
     def testprep(matnum):
         for encoding in ['utf-8', 'utf-16', 'Windows-1252']:
@@ -169,10 +168,9 @@ Splits this many of the MATs into 2.''')
             for var in product(*defs.TestAlgorithmVariables):
                 go += 1
                 algorithm = defs.TestAlgorithmMaker(var)
-                print(var)
                 results = doit(algorithm, testeds, 1, testing=True)
-                print('\nTry {}'.format(go))
-                print(algorithm)
+                msg.TRY(go)
+                print(algorithm, flush=True)
                 for resulthing in results:
                     pprint(resulthing[0])
                     done = False
@@ -183,7 +181,7 @@ Splits this many of the MATs into 2.''')
                             done = True
                             break
                     if done:
-                        print(dicttobewritten)
+                        print(dicttobewritten, flush=True)
                         dictstobewritten.append(dicttobewritten)
             writer.writerows(dictstobewritten)
 

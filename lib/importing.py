@@ -3,7 +3,7 @@ def importer(extras, testing=False):
     from tinydb import TinyDB, Query
     import progressbar as pbar
     import numpy as np
-    from random import shuffle, randint
+    from random import randint
     from lib.misc import getpostcodes
     import defaults as defs
     from collections import Counter
@@ -29,8 +29,8 @@ def importer(extras, testing=False):
     if tablestring in MATs.tables():
         return (tablestring, True)
     else:
-        print('Table not found: compiling')
-        print('(tablestring: {})'.format(tablestring))
+        Messages.COMPILE()
+        Messages.TABLESTRING(tablestring)
 
     table = MATs.table(tablestring)
     extras2 = extras + ['URN', ] + defs.ProgressScoreHeaders
@@ -43,7 +43,6 @@ def importer(extras, testing=False):
         Messages.WORKING(file, num + 1, len1)
         for encoding in ['utf-8', 'utf-16', 'Windows-1252']:
             try:
-                Messages.TRY(encoding)
                 openfile = open(coredir + '/' + file, encoding=encoding)
                 openfile.read
                 openfile.close()
@@ -127,7 +126,7 @@ def importer(extras, testing=False):
             for i, x in enumerate(mats):
                 changed.append(self.function(x))
                 if i % rand == 0:
-                    print('{} is {}% done'.format(self.name, int(i * 100 / matlen)))
+                    print('{} is {}% done'.format(self.name, int(i * 100 / matlen)), flush=True)
                     if matlock.acquire(blocking=False):
                         changed = submitchanged(changed)
                         matlock.release()
@@ -135,7 +134,7 @@ def importer(extras, testing=False):
                 matlock.acquire()
                 submitchanged(changed)
                 matlock.release()
-                print('{} is 100% done'.format(self.name))
+                print('{} is 100% done'.format(self.name), flush=True)
 
     def lentest(t):
         return len(t) == 1
@@ -204,7 +203,7 @@ def importer(extras, testing=False):
                         IDData = core.get(doc_id=ID)
                         corelock.release()
                     except TypeError:
-                        print(ID)
+                        print(ID, flush=True)
                         raise
                     if 'cord' in IDData:
                         cords2.append(IDData['cord'])
@@ -317,23 +316,22 @@ def importer(extras, testing=False):
             process.append((y, z))
     for x, y in process:
         if (x, y) == ('geo', 'rmsd'):
-            threads.append(ThreadedProccessor(PCdist, 'Finding {} of {}'.format(x, y)))
+            threads.append(ThreadedProccessor(PCdist, Messages.PCDIST()))
             continue
-        Messages.OpDeclare(y, x)
+        Message = Messages.PARG(x, y)
         if (x, y) == ('trust', 'size'):
-            threads.append(ThreadedProccessor(sizecheck, 'Finding {} of {}'.format(x, y)))
+            threads.append(ThreadedProccessor(sizecheck, Message))
         elif (x, y) == ('houseprice', 'avg'):
-            threads.append(ThreadedProccessor(pricecheck, 'Finding {} of {}'.format(x, y)))
+            threads.append(ThreadedProccessor(pricecheck, Message))
         else:
-            threads.append(ThreadedProccessor(operator(x, y), 'Finding {} of {}'.format(x, y)))
+            threads.append(ThreadedProccessor(operator(x, y), Message))
     for thread in threads:
         thread.start()
     for thread in threads:
         thread.join()
     for x in [noncore, MATs, core, counties]:
         x.close()
-    print('\a')
-    print('tablestring:', tablestring)
+    print('\a', flush=True)
     return (tablestring, False)
 
 

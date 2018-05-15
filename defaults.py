@@ -9,8 +9,12 @@ algorithm = [
 CoreDirectory = './Core'
 NonCoreDirectory = './non_Core'
 MatNameKey = 'Trusts (name)'
+# Heading of the po
 PostCodeKey = 'Postcode'
+# URL of the postcodes.io API
 ApiURL = 'http://api.postcodes.io/postcodes/'
+
+
 TestAlgorithmVariables = (range(4), ) * 5
 
 

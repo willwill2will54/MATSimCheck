@@ -45,7 +45,7 @@ def tester(MAT, table, algorithm=['geormsd', 'wgt', '500'], number=None, testing
                         if str(x[key]) != str(method):
                             x['sims'] += float(value)
                     except Exception as e:
-                        print(x)
+                        print(x, flush=True)
                         pprint(cand)
                         raise e
             elif method.endswith('gets'):
@@ -57,7 +57,7 @@ def tester(MAT, table, algorithm=['geormsd', 'wgt', '500'], number=None, testing
                         if str(x[key]) == str(method):
                             x['sims'] += float(value)
                     except Exception as e:
-                        print(x)
+                        print(x, flush=True)
                         pprint(cand)
                         raise e
             elif method == 'wgt':
@@ -69,7 +69,7 @@ then try again if you want to use this variable.'.format(key))
                     continue
                 elif key not in tested.keys():
                     print('{} has not been calculated for the tested MAT. Purge and recompile, \
-then try again if you want to use this variable.'.format(key))
+then try again if you want to use this variable.'.format(key), flush=True)
                     continue
                 for x in cand:
                     try:
@@ -80,12 +80,12 @@ then try again if you want to use this variable.'.format(key))
                     except KeyError as e:
                         x['sims'] += float(value)
                         errorcount += 1
-                        print('Weight exception: {} not found ({}/{})'.format(e, errorcount, len(cand)))
+                        print('Weight exception: {} not found ({}/{})'.format(e, errorcount, len(cand)), flush=True)
                     donecand.append(dict(x))
                 cand = donecand[:]
 
         except KeyError:
-            print(x, tested, key)
+            print(x, tested, key, flush=True)
             raise
     MATs.close()
     for x in cand:
