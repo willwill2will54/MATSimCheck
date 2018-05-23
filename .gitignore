@@ -1,2 +1,5 @@
 *.pyc
 *.cpython-36.pyc
+*.json
+dbs/Core.json
+dbs/MATS.json
