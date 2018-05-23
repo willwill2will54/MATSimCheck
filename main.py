@@ -17,7 +17,6 @@ import lib.messages as msg
 from lib.testing import tester
 from lib.importing import importer, MATList
 from lib.misc import ensure_dir
-from argparseweb import *
 
 _1 = sys.argv[0]
 _2 = os.path.dirname(_1)
@@ -72,8 +71,7 @@ def main():
     test.add_argument('--plural', '-p', type=int, default=20, metavar='x', help='''\
 Splits this many of the MATs into 2.''')
 
-    # args = parser.parse_args()
-    args = webui.Webui(parser).getone()
+    args = parser.parse_args()
 
     if args.action == 'Purge':
         msg.PURGE()

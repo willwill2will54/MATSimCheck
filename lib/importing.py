@@ -137,7 +137,6 @@ def importer(extras, testing=False):
                 matlock.acquire()
                 submitchanged(changed)
                 matlock.release()
-                print('{} is 100% done'.format(self.name), flush=True)
 
     class ThreadedMessage(threading.Thread):
         def __init__(self):
