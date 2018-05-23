@@ -25,7 +25,7 @@ if _2 is not '':
 
 
 # Gooey automatically generates a GUI
-# @Gooey(program_name='MATSimCheck', image_dir='lib/img', monospace_display=True)
+@Gooey(program_name='MATSimCheck', image_dir='lib/img', monospace_display=True)
 def main():
     # Open the databases
     noncore = TinyDB('./dbs/non_Core.json')
