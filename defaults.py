@@ -9,7 +9,7 @@ algorithm = [
 CoreDirectory = './Core'
 NonCoreDirectory = './non_Core'
 MatNameKey = 'Trusts (name)'
-# Heading of the po
+# Heading of the postcode field in the data
 PostCodeKey = 'Postcode'
 # URL of the postcodes.io API
 ApiURL = 'http://api.postcodes.io/postcodes/'
@@ -29,4 +29,6 @@ def TestAlgorithmMaker(variables):
         'StatutoryHighAge', 'rmsd', 'wgt', str(variables[4])]
     return algorithm
 
-ProgressScoreHeaders = ['School level reading progress score', 'School level writing progress score', 'School level maths progress score', 'School level progress 8 score']
+
+ProgressScoreHeaders = ['School level reading progress score', 'School level writing progress score',
+                        'School level maths progress score', 'School level progress 8 score']

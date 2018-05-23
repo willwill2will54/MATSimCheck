@@ -104,6 +104,7 @@ def importer(extras, testing=False):
     corelock = threading.Lock()
     matlock = threading.Lock()
     weblock = threading.Lock()
+    comlocktable = []
 
     def submitchanged(changed):
         for thang in changed:
@@ -115,33 +116,58 @@ def importer(extras, testing=False):
             threading.Thread.__init__(self)
             self.function = function
             self.name = name
+            self.id = len(comlocktable)
+            comlocktable.append([threading.Lock(), name, 0])
 
         def run(self):
             matlock.acquire()
             mats = table.all()
             matlock.release()
             changed = []
-            rand = randint(30, 40)
             matlen = len(mats)
             for i, x in enumerate(mats):
                 changed.append(self.function(x))
-                if i % rand == 0:
-                    print('{} is {}% done'.format(self.name, int(i * 100 / matlen)), flush=True)
-                    if matlock.acquire(blocking=False):
-                        changed = submitchanged(changed)
-                        matlock.release()
+                comlocktable[self.id][0].acquire()
+                comlocktable[self.id][2] = int(i * 100 / matlen)
+                comlocktable[self.id][0].release()
+                if matlock.acquire(blocking=False):
+                    changed = submitchanged(changed)
+                    matlock.release()
             if changed != []:
                 matlock.acquire()
                 submitchanged(changed)
                 matlock.release()
                 print('{} is 100% done'.format(self.name), flush=True)
 
+    class ThreadedMessage(threading.Thread):
+        def __init__(self):
+            threading.Thread.__init__(self)
+
+        def run(self):
+            from time import sleep
+            while all(x.is_alive() for x in threads):
+                prints = []
+                for x in comlocktable:
+                    x[0].acquire()
+                    name = x[1]
+                    pc = x[2]
+                    x[0].release()
+                    prints.append('{} is {}% done'.format(name, pc))
+                for x in prints:
+                    print(x, flush=True)
+                sleep(2)
+            prints = []
+            for x in comlocktable:
+                name = x[1]
+                prints.append('{} is {}% done'.format(name, 100))
+            for x in prints:
+                print(x, flush=True)
+
     def lentest(t):
         return len(t) == 1
 
     table.remove(Query().IDs.test(lentest))
     Messages.PARGS()
-
 
     def pricecheck(x):
         countieslist, nums, cords, postcodes = [], [], [], []
@@ -325,10 +351,13 @@ def importer(extras, testing=False):
             threads.append(ThreadedProccessor(pricecheck, Message))
         else:
             threads.append(ThreadedProccessor(operator(x, y), Message))
+    Messageing = ThreadedMessage()
     for thread in threads:
         thread.start()
+    Messageing.start()
     for thread in threads:
         thread.join()
+    Messageing.join()
     for x in [noncore, MATs, core, counties]:
         x.close()
     print('\a', flush=True)

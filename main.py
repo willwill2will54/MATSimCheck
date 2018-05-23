@@ -1,28 +1,32 @@
+# Python modules, built-in
 import sys
 import random
 import csv
-from shlex import split as shlexsplit
 import os
-import lib.messages as msg
+import itertools
+from shlex import split as shlexsplit
 from itertools import product
 from collections import Counter
-from tinydb import TinyDB
 from pprint import pprint
+# Python modules, install with pip
+from tinydb import TinyDB
+from gooey import Gooey, GooeyParser
+# My stuff, included in package
 import defaults as defs
+import lib.messages as msg
 from lib.testing import tester
 from lib.importing import importer, MATList
 from lib.misc import ensure_dir
-import time
-from gooey import Gooey, GooeyParser
-import itertools
+from argparseweb import *
 
 _1 = sys.argv[0]
 _2 = os.path.dirname(_1)
 if _2 is not '':
     os.chdir(_2)
 
+
 # Gooey automatically generates a GUI
-@Gooey(program_name='MATSimCheck', image_dir='lib', monospace_display=True)
+# @Gooey(program_name='MATSimCheck', image_dir='lib/img', monospace_display=True)
 def main():
     # Open the databases
     noncore = TinyDB('./dbs/non_Core.json')
@@ -68,7 +72,8 @@ def main():
     test.add_argument('--plural', '-p', type=int, default=20, metavar='x', help='''\
 Splits this many of the MATs into 2.''')
 
-    args = parser.parse_args()
+    # args = parser.parse_args()
+    args = webui.Webui(parser).getone()
 
     if args.action == 'Purge':
         msg.PURGE()
