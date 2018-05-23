@@ -1,19 +1,12 @@
 def importer(extras, testing=False):
     import lib.messages as Messages
     from tinydb import TinyDB, Query
-    import progressbar as pbar
     import numpy as np
-    from random import randint
     from lib.misc import getpostcodes
     import defaults as defs
     from collections import Counter
     from os import listdir
     import threading
-    widgets = [
-        pbar.AnimatedMarker(markers='⣯⣟⡿⢿⣻⣽⣾⣷'),
-        ' [', pbar.Percentage(), '] ',
-        pbar.Bar(marker='■', fill='□', left='[', right=']'),
-        ' (', pbar.AdaptiveETA(), ') ', ]
     np.seterr(all='raise')
     noncore = TinyDB('./dbs/non_Core.json',)
     MATs = TinyDB('./dbs/MATS.json')
@@ -41,6 +34,7 @@ def importer(extras, testing=False):
     Messages.IMPORT('core')
     for num, file in enumerate([each for each in listdir(coredir) if each.endswith('.csv')]):
         Messages.WORKING(file, num + 1, len1)
+        lastpc = 0
         for encoding in ['utf-8', 'utf-16', 'Windows-1252']:
             try:
                 openfile = open(coredir + '/' + file, encoding=encoding)
@@ -49,28 +43,33 @@ def importer(extras, testing=False):
                 with open(coredir + '/' + file, 'r', encoding=encoding) as openfile:
                     raw = csv.DictReader(openfile, delimiter=',')
                     dicts = [dict(row) for row in raw]
-                    with pbar.ProgressBar(max_value=len(dicts) ** 2, redirect_stdout=True, widgets=widgets) as bar:
-                        for i, x in enumerate(dicts):
-                            urn = x['URN']
-                            urns.append(urn)
-                            Mat_in = core.upsert(x, Query().URN == urn)
-                            if type(Mat_in) == int:
-                                Mat_in = [Mat_in, ]
-                            try:
-                                search = table.search(Query()['Trust name'] == x[defs.MatNameKey])
-                                Mat_in.extend([x for x in search[0]['IDs']])
-                            except Exception:
-                                pass
-                            table.upsert({"Trust name": x[defs.MatNameKey],
-                                          "IDs": list(set(Mat_in))}, Query()['Trust name'] == x[defs.MatNameKey])
-                            bar.update((i + 1) ** 2)
-                        break
+                    maxthing = len(dicts) ** 2
+                    for i, x in enumerate(dicts):
+                        urn = x['URN']
+                        urns.append(urn)
+                        Mat_in = core.upsert(x, Query().URN == urn)
+                        if type(Mat_in) == int:
+                            Mat_in = [Mat_in, ]
+                        try:
+                            search = table.search(Query()['Trust name'] == x[defs.MatNameKey])
+                            Mat_in.extend([x for x in search[0]['IDs']])
+                        except Exception:
+                            pass
+                        table.upsert({"Trust name": x[defs.MatNameKey],
+                                      "IDs": list(set(Mat_in))}, Query()['Trust name'] == x[defs.MatNameKey])
+                        pc = int((((i + 1) ** 2) / maxthing) * 100)
+                        if pc != lastpc:
+                            Messages.PROGRESS('This', pc)
+                            lastpc = pc
+                    break
             except UnicodeError:
                 pass
+        Messages.PROGRESS('This', 100)
     len2 = len([each for each in listdir(noncoredir) if each.endswith('.csv')])
     Messages.IMPORT('non-core')
     for num, file in enumerate([each for each in listdir(noncoredir) if each.endswith('.csv')]):
         Messages.WORKING(file, num + 1, len2)
+        lastpc = 0
         for encoding in ['utf-8', 'utf-16', 'Windows-1252']:
             try:
                 openfile = open('./non_Core/' + file, encoding=encoding)
@@ -79,20 +78,23 @@ def importer(extras, testing=False):
                     raw = csv.DictReader(openfile, delimiter=',')
                     dicts = [dict(row) for row in raw]
                     keys = set()
-                    with pbar.ProgressBar(max_value=len(dicts) ** 2, redirect_stdout=True, widgets=widgets) as bar:
-                        for i, x in enumerate(dicts):
-                            urn = x['URN']
-                            keys.update(set(x.keys()))
-                            if urn in urns:
-                                to_delete = set(x.keys()).difference(extras2)
-                                for d in to_delete:
-                                    del x[d]
-                                noncore.upsert(x, Query().URN == urn)
-                                core.update(x, Query().URN == urn)
-                            bar.update((i + 1) ** 2)
+                    for i, x in enumerate(dicts):
+                        urn = x['URN']
+                        keys.update(set(x.keys()))
+                        if urn in urns:
+                            to_delete = set(x.keys()).difference(extras2)
+                            for d in to_delete:
+                                del x[d]
+                            noncore.upsert(x, Query().URN == urn)
+                            core.update(x, Query().URN == urn)
+                        pc = int((((i + 1) ** 2) / maxthing) * 100)
+                        if pc != lastpc:
+                            Messages.PROGRESS('This', pc)
+                            lastpc = pc
                         break
             except UnicodeError:
                 pass
+        Messages.PROGRESS('This', 100)
     with open('./special/HousePrices.csv') as openfile:
         raw = csv.DictReader(openfile, delimiter=',')
         dicts = [dict(row) for row in raw]

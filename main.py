@@ -7,7 +7,6 @@ import itertools
 from shlex import split as shlexsplit
 from itertools import product
 from collections import Counter
-from pprint import pprint
 # Python modules, install with pip
 from tinydb import TinyDB
 from gooey import Gooey, GooeyParser
@@ -23,9 +22,10 @@ _2 = os.path.dirname(_1)
 if _2 is not '':
     os.chdir(_2)
 
+sys.setrecursionlimit(1500)
 
 # Gooey automatically generates a GUI
-@Gooey(program_name='MATSimCheck', image_dir='lib/img', monospace_display=True)
+@Gooey(program_name='MATSimCheck', image_dir='lib/img', monospace_display=True, progress_regex=r"^This is (\d+)% done$")
 def main():
     # Open the databases
     noncore = TinyDB('./dbs/non_Core.json')
@@ -175,7 +175,6 @@ Splits this many of the MATs into 2.''')
                 msg.TRY(go)
                 print(algorithm, flush=True)
                 for resulthing in results:
-                    pprint(resulthing[0])
                     done = False
                     for pos, thing in enumerate(resulthing[1]):
                         if thing[0].startswith(resulthing[0][:-1]) and thing[0].endswith('2'):
@@ -184,7 +183,6 @@ Splits this many of the MATs into 2.''')
                             done = True
                             break
                     if done:
-                        print(dicttobewritten, flush=True)
                         dictstobewritten.append(dicttobewritten)
             writer.writerows(dictstobewritten)
 
