@@ -6,12 +6,36 @@ def importer(extras, testing=False):
     import defaults as defs
     from collections import Counter
     from os import listdir
-    import threading
+    import multiprocessing
+    from multiprocessing.managers import BaseManager
     np.seterr(all='raise')
+    class myManager(BaseManager):
+        pass
+
+    Manager = multiprocessing.Manager()
+    def submitchanged(changed):
+        for thang in changed:
+            table.update(thang, doc_ids=[thang.doc_id, ])
+        return []
+
+    myManager.register('submitchanged', submitchanged)
+
+    
+    corelock = Manager.Lock()
+    matlock = Manager.Lock()
+    weblock = Manager.Lock()
+    countylock = Manager.Lock()
+    comtable = Manager.list()
+    comlocktable = []
+    locks = Manager.dict()
+    finished = Manager.Event()
+
     noncore = TinyDB('./dbs/non_Core.json',)
     MATs = TinyDB('./dbs/MATS.json')
     core = TinyDB('./dbs/Core.json')
     counties = TinyDB('./dbs/Counties.json')
+
+    locks ={'matlock': matlock, 'weblock': weblock, 'countylock': countylock, 'corelock': corelock}
     tablestring = '|'.join(x for x in extras)
     if testing:
         tablestring += '**testdataset**'
@@ -25,7 +49,11 @@ def importer(extras, testing=False):
         Messages.COMPILE()
         Messages.TABLESTRING(tablestring)
 
+
     table = MATs.table(tablestring)
+    dbs = {'noncore': noncore, 'MATs': MATs, 'core': core, 'counties': counties, 'table': table}
+    myManager.register('dbs', dbs)
+    MyManager = myManager()
     extras2 = extras + ['URN', ] + defs.ProgressScoreHeaders
     extras1 = extras
     import csv
@@ -103,63 +131,60 @@ def importer(extras, testing=False):
 
     threads = []
 
-    corelock = threading.Lock()
-    matlock = threading.Lock()
-    weblock = threading.Lock()
-    comlocktable = []
 
-    def submitchanged(changed):
-        for thang in changed:
-            table.update(thang, doc_ids=[thang.doc_id, ])
-        return []
 
-    class ThreadedProccessor(threading.Thread):
+    submitchangedprox = MyManager.submitchanged
+
+    class ThreadedProccessor(multiprocessing.Process):
         def __init__(self, function, name):
-            threading.Thread.__init__(self)
+            multiprocessing.Process.__init__(self)
             self.function = function
             self.name = name
-            self.id = len(comlocktable)
-            comlocktable.append([threading.Lock(), name, 0])
+            self.id = len(comlocktable[:])
+            self.dbs = dbs
+            submitchangedprox
+            comlocktable.append(multiprocessing.Lock())
+            comtable.append([name, 0])
 
         def run(self):
-            matlock.acquire()
-            mats = table.all()
-            matlock.release()
+            locks['matlock'].acquire()
+            mats = self.dbs['table'].all()
+            locks['matlock'].release()
             changed = []
             matlen = len(mats)
             for i, x in enumerate(mats):
-                changed.append(self.function(x))
-                comlocktable[self.id][0].acquire()
-                comlocktable[self.id][2] = int(i * 100 / matlen)
-                comlocktable[self.id][0].release()
-                if matlock.acquire(blocking=False):
-                    changed = submitchanged(changed)
-                    matlock.release()
+                changed.append(self.function(x, self.dbs, locks))
+                comlocktable[self.id].acquire()
+                comtable[self.id][1] = int(i * 100 / matlen)
+                comlocktable[self.id].release()
+                if locks['matlock'].acquire(blocking=False):
+                    changed = submitchangedprox(changed)
+                    locks['matlock'].release()
             if changed != []:
-                matlock.acquire()
-                submitchanged(changed)
+                locks['matlock'].acquire()
+                submitchangedprox(changed)
                 matlock.release()
 
-    class ThreadedMessage(threading.Thread):
+    class ThreadedMessage(multiprocessing.Process):
         def __init__(self):
-            threading.Thread.__init__(self)
+            multiprocessing.Process.__init__(self)
 
         def run(self):
             from time import sleep
-            while all(x.is_alive() for x in threads):
+            while not finished.is_set():
                 prints = []
-                for x in comlocktable:
-                    x[0].acquire()
-                    name = x[1]
-                    pc = x[2]
-                    x[0].release()
+                for x, y in zip(comlocktable, comtable):
+                    x.acquire()
+                    name = y[0]
+                    pc = y[1]
+                    x.release()
                     prints.append('{} is {}% done'.format(name, pc))
                 for x in prints:
                     print(x, flush=True)
                 sleep(2)
             prints = []
-            for x in comlocktable:
-                name = x[1]
+            for x in comtable:
+                name = x[0]
                 prints.append('{} is {}% done'.format(name, 100))
             for x in prints:
                 print(x, flush=True)
@@ -170,19 +195,20 @@ def importer(extras, testing=False):
     table.remove(Query().IDs.test(lentest))
     Messages.PARGS()
 
-    def pricecheck(x):
+    def pricecheck(x, dbs, locks):
+
         countieslist, nums, cords, postcodes = [], [], [], []
         for ID in x['IDs']:
-            corelock.acquire()
-            y = core.get(doc_id=ID)
-            corelock.release()
+            locks['corelock'].acquire()
+            y = dbs['core'].get(doc_id=ID)
+            locks['corelock'].release()
             if 'cord' in y:
                 cords.append(y['cord'])
             else:
                 postcodes.append(y[defs.PostCodeKey])
         cords2 = None
         if postcodes != []:
-                weblock.acquire()
+                locks['weblock'].acquire()
                 while True:
                     try:
                         cords2 = getpostcodes(postcodes)
@@ -190,19 +216,21 @@ def importer(extras, testing=False):
                         break
                     except Exception:
                         Messages.WebTrouble()
-                weblock.release()
+                locks['weblock'].release()
         if cords2 is not None:
-                corelock.acquire()
+                locks['corelock'].acquire()
                 for cord in cords2:
-                    core.update({'cord': cord}, Query()[defs.PostCodeKey] == cord['postcode'])
-                corelock.release()
+                    dbs['core'].update({'cord': cord}, Query()[defs.PostCodeKey] == cord['postcode'])
+                locks['corelock'].release()
                 cords += cords2
         for y in cords:
             countieslist.append(y['codes']['admin_county'])
         for y in countieslist:
             try:
-                z = counties.get(Query().CountyCode == y)
+                locks['countylock'].acquire()
+                z = dbs['counties'].get(Query().CountyCode == y)
                 nums.append(int(z['MedianHousePrice']))
+                locks['countylock'].acquire()
             except TypeError:
                 pass
         try:
@@ -211,13 +239,13 @@ def importer(extras, testing=False):
             pass
         return x
 
-    def sizecheck(x):
+    def sizecheck(x, dbs, locks):
             if 'trustsize' in x:
                 return x
             x['trustsize'] = len(x['IDs'])
             return x
 
-    def PCdist(x):
+    def PCdist(x, dbs, locks):
             if 'geormsd' in x:
                 return x
             IDs = x['IDs']
@@ -226,9 +254,9 @@ def importer(extras, testing=False):
             for ID in IDs:
                 try:
                     try:
-                        corelock.acquire()
-                        IDData = core.get(doc_id=ID)
-                        corelock.release()
+                        locks['corelock'].acquire()
+                        IDData = dbs['core'].get(doc_id=ID)
+                        locks['corelock'].release()
                     except TypeError:
                         print(ID, flush=True)
                         raise
@@ -238,7 +266,7 @@ def importer(extras, testing=False):
                 except KeyError:
                     raise
             if Postcodes != []:
-                weblock.acquire()
+                self.locks['weblock'].acquire()
                 while True:
                     try:
                         cords3 = getpostcodes(Postcodes)
@@ -246,12 +274,12 @@ def importer(extras, testing=False):
                         break
                     except Exception:
                         Messages.WebTrouble()
-                weblock.release()
+                self.locks['weblock'].release()
             if cords3 is not None:
-                corelock.acquire()
+                locks['corelock'].acquire()
                 for cord in cords3:
-                    core.update({'cord': cord}, Query()[defs.PostCodeKey] == cord['postcode'])
-                corelock.release()
+                    dbs['core'].update({'cord': cord}, Query()[defs.PostCodeKey] == cord['postcode'])
+                locks['corelock'].release()
                 cords2 += cords3
             cords = [(x['northings'], x['eastings']) for x in cords2]
             cordsa = np.array(cords)
@@ -266,67 +294,67 @@ def importer(extras, testing=False):
 
     def operator(key, operation):
         if operation == 'avg':
-            def avg(x, key):
+            def avg(x, key, dbs, locks):
                 if key + 'avg' in x:
                     return x
                 nums = []
-                corelock.acquire()
+                locks['corelock'].acquire()
                 for ID in x['IDs']:
-                    nums.append(float(core.get(doc_id=ID)[key]))
-                corelock.release()
+                    nums.append(float(dbs['core'].get(doc_id=ID)[key]))
+                locks['corelock'].release()
                 try:
                     x[key + 'avg'] = np.average(np.array(nums))
                 except Exception:
                     pass
                 return x
-            func = lambda t: avg(t, key)
+            func = lambda t, dbs, locks: avg(t, key, dbs, locks)
         elif operation == 'rmsd':
-            def rmsd(x, key):
+            def rmsd(x, key, dbs, locks):
                 if key + 'rmsd' in x:
                     return x
                 array = np.array([])
                 nums = []
-                corelock.acquire()
+                locks['corelock'].acquire()
                 for ID in x['IDs']:
-                    nums.append(float(core.get(doc_id=ID)[key]))
-                corelock.release()
+                    nums.append(float(dbs['core'].get(doc_id=ID)[key]))
+                locks['corelock'].release()
                 array = np.append(array, nums)
                 try:
                     x[key + 'rmsd'] = np.std(array)
                 except Exception:
                     pass
                 return x
-            func = lambda t: rmsd(t, key)
+            func = lambda t, dbs, locks: rmsd(t, key, dbs, locks)
         elif operation == 'mode':
-            def mode(x, key):
+            def mode(x, key, dbs, locks):
                 if key + 'mode' in x:
                     return x
-                corelock.acquire()
-                stuff = [core.get(doc_id=ID)[key] for ID in x['IDs']]
-                corelock.release()
+                locks['corelock'].acquire()
+                stuff = [dbs['core'].get(doc_id=ID)[key] for ID in x['IDs']]
+                locks['corelock'].release()
                 x[key + 'mode'] = Counter(stuff).most_common(1)[0][0]
                 return x
-            func = lambda t: mode(t, key)
+            func = lambda t, dbs, locks: mode(t, key, dbs, locks)
         elif operation == 'rng':
-            def rng(x, key):
+            def rng(x, key, dbs, locks):
                 if key + 'rng' in x:
                     return x
-                corelock.acquire()
-                stuff = [core.get(doc_id=ID)[key] for ID in x['IDs']]
-                corelock.release()
+                locks['corelock'].acquire()
+                stuff = [dbs['core'].get(doc_id=ID)[key] for ID in x['IDs']]
+                locks['corelock'].release()
                 x[key + 'rng'] = max(stuff) - min(stuff)
                 return x
-            func = lambda t: rng(t, key)
+            func = lambda t, dbs, locks: rng(t, key, dbs, locks)
         elif operation == 'med':
-            def med(x, key):
+            def med(x, key, dbs, locks):
                 try:
                     if key + 'med' in x:
                         return x
                     nums = []
-                    corelock.acquire()
+                    locks['corelock'].acquire()
                     for ID in x['IDs']:
-                        nums.append(float(core.get(doc_id=ID)[key]))
-                    corelock.release()
+                        nums.append(float(dbs['core'].get(doc_id=ID)[key]))
+                    locks['corelock'].release()
                     try:
                         x[key + 'med'] = np.median(np.array(nums))
                     except Exception:
@@ -334,7 +362,7 @@ def importer(extras, testing=False):
                 except Exception:
                     pass
                 return x
-            func = lambda t: med(t, key)
+            func = lambda t, dbs, locks: med(t, key, dbs, locks)
         return func
     process = []
     ops = ['avg', 'rmsd', 'med', 'rng', 'mode', 'size']
@@ -352,12 +380,14 @@ def importer(extras, testing=False):
             threads.append(ThreadedProccessor(pricecheck, Message))
         else:
             threads.append(ThreadedProccessor(operator(x, y), Message))
+    MyManager.start()
     Messageing = ThreadedMessage()
     for thread in threads:
         thread.start()
     Messageing.start()
     for thread in threads:
         thread.join()
+    finished.set()
     Messageing.join()
     for x in [noncore, MATs, core, counties]:
         x.close()
