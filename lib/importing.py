@@ -13,6 +13,7 @@ def importer(extras, testing=False):
         pass
 
     Manager = multiprocessing.Manager()
+
     def submitchanged(changed):
         for thang in changed:
             table.update(thang, doc_ids=[thang.doc_id, ])
@@ -20,13 +21,10 @@ def importer(extras, testing=False):
 
     myManager.register('submitchanged', submitchanged)
 
-    
     corelock = Manager.Lock()
     matlock = Manager.Lock()
     weblock = Manager.Lock()
     countylock = Manager.Lock()
-    comtable = Manager.list()
-    comlocktable = []
     locks = Manager.dict()
     finished = Manager.Event()
 
@@ -35,7 +33,7 @@ def importer(extras, testing=False):
     core = TinyDB('./dbs/Core.json')
     counties = TinyDB('./dbs/Counties.json')
 
-    locks ={'matlock': matlock, 'weblock': weblock, 'countylock': countylock, 'corelock': corelock}
+    locks = {'matlock': matlock, 'weblock': weblock, 'countylock': countylock, 'corelock': corelock}
     tablestring = '|'.join(x for x in extras)
     if testing:
         tablestring += '**testdataset**'
@@ -48,7 +46,6 @@ def importer(extras, testing=False):
     else:
         Messages.COMPILE()
         Messages.TABLESTRING(tablestring)
-
 
     table = MATs.table(tablestring)
     dbs = {'noncore': noncore, 'MATs': MATs, 'core': core, 'counties': counties, 'table': table}
@@ -131,8 +128,6 @@ def importer(extras, testing=False):
 
     threads = []
 
-
-
     submitchangedprox = MyManager.submitchanged
 
     class ThreadedProccessor(multiprocessing.Process):
@@ -140,54 +135,28 @@ def importer(extras, testing=False):
             multiprocessing.Process.__init__(self)
             self.function = function
             self.name = name
-            self.id = len(comlocktable[:])
             self.dbs = dbs
             submitchangedprox
-            comlocktable.append(multiprocessing.Lock())
-            comtable.append([name, 0])
 
         def run(self):
             locks['matlock'].acquire()
             mats = self.dbs['table'].all()
             locks['matlock'].release()
             changed = []
-            matlen = len(mats)
+            pcvar = 100 / len(mats)
+            print('{} is {}% done'.format(self.name, 0))
             for i, x in enumerate(mats):
                 changed.append(self.function(x, self.dbs, locks))
-                comlocktable[self.id].acquire()
-                comtable[self.id][1] = int(i * 100 / matlen)
-                comlocktable[self.id].release()
+                pc = int(i * pcvar)
+                print('{} is {}% done'.format(self.name, pc))
                 if locks['matlock'].acquire(blocking=False):
-                    changed = submitchangedprox(changed)
+                    submitchangedprox(changed)
+                    changed = []
                     locks['matlock'].release()
             if changed != []:
                 locks['matlock'].acquire()
                 submitchangedprox(changed)
-                matlock.release()
-
-    class ThreadedMessage(multiprocessing.Process):
-        def __init__(self):
-            multiprocessing.Process.__init__(self)
-
-        def run(self):
-            from time import sleep
-            while not finished.is_set():
-                prints = []
-                for x, y in zip(comlocktable, comtable):
-                    x.acquire()
-                    name = y[0]
-                    pc = y[1]
-                    x.release()
-                    prints.append('{} is {}% done'.format(name, pc))
-                for x in prints:
-                    print(x, flush=True)
-                sleep(2)
-            prints = []
-            for x in comtable:
-                name = x[0]
-                prints.append('{} is {}% done'.format(name, 100))
-            for x in prints:
-                print(x, flush=True)
+                locks['matlock'].release()
 
     def lentest(t):
         return len(t) == 1
@@ -214,7 +183,8 @@ def importer(extras, testing=False):
                         cords2 = getpostcodes(postcodes)
                         assert cords2 is not None
                         break
-                    except Exception:
+                    except Exception as e:
+                        print(e)
                         Messages.WebTrouble()
                 locks['weblock'].release()
         if cords2 is not None:
@@ -266,15 +236,16 @@ def importer(extras, testing=False):
                 except KeyError:
                     raise
             if Postcodes != []:
-                self.locks['weblock'].acquire()
+                locks['weblock'].acquire()
                 while True:
                     try:
                         cords3 = getpostcodes(Postcodes)
                         assert cords3 is not None
                         break
-                    except Exception:
+                    except Exception as e:
+                        print(e)
                         Messages.WebTrouble()
-                self.locks['weblock'].release()
+                locks['weblock'].release()
             if cords3 is not None:
                 locks['corelock'].acquire()
                 for cord in cords3:
@@ -381,14 +352,11 @@ def importer(extras, testing=False):
         else:
             threads.append(ThreadedProccessor(operator(x, y), Message))
     MyManager.start()
-    Messageing = ThreadedMessage()
     for thread in threads:
         thread.start()
-    Messageing.start()
     for thread in threads:
         thread.join()
     finished.set()
-    Messageing.join()
     for x in [noncore, MATs, core, counties]:
         x.close()
     print('\a', flush=True)

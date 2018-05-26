@@ -56,4 +56,4 @@ def TABLESTRING(tablestring):
 
 
 def PROGRESS(thing, pc):
-    print('{} is {}% done'.format(thing, pc), flush=True)
+    print('{} is {}% done'.format(thing, pc), flush=True, end='\r')
