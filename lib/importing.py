@@ -343,7 +343,7 @@ def importer(extras, testing=False):
         thread.start()
     done = 0
     while done < 2:
-        if any(not thread.is_alive() for thread in threads):
+        if all(not thread.is_alive() for thread in threads):
             done += 1
         try:
             thang = queue.get(timeout=2)
