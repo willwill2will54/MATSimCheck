@@ -163,16 +163,16 @@ def importer(extras, testing=False):
                 postcodes.append(y[defs.PostCodeKey])
         cords2 = None
         if postcodes != []:
-                locks['weblock'].acquire()
-                while True:
-                    try:
-                        cords2 = getpostcodes(postcodes)
-                        assert cords2 is not None
-                        break
-                    except Exception as e:
-                        print(e)
-                        Messages.WebTrouble()
-                locks['weblock'].release()
+            locks['weblock'].acquire()
+            while True:
+                try:
+                    cords2 = getpostcodes(postcodes)
+                    assert cords2 is not None
+                    break
+                except Exception as e:
+                    print(e)
+                    Messages.WebTrouble()
+            locks['weblock'].release()
         if cords2 is not None:
                 locks['corelock'].acquire()
                 for cord in cords2:
@@ -186,7 +186,7 @@ def importer(extras, testing=False):
                 locks['countylock'].acquire()
                 z = dbs['counties'].get(Query().CountyCode == y)
                 nums.append(int(z['MedianHousePrice']))
-                locks['countylock'].acquire()
+                locks['countylock'].release()
             except TypeError:
                 pass
         try:
