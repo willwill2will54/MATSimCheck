@@ -109,8 +109,7 @@ Splits this many of the MATs into 2.''')
             retresults = []
             poolsize = min([defs.corecount, len(tested)])
             with Pool(poolsize) as pool:
-                results = pool.imap_unordered(partial(tester, table, algorithm=algorithm, number=num, testing=testing), tested)
-                for result in results:
+                for result in pool.imap_unordered(partial(tester, table, algorithm=algorithm, number=num, testing=testing), tested):
                     print('{} is most similar to {}'.format(x, ' then '.join(result[0])), flush=True)
                     retresults.append((x, result[1]))
             if testing:
