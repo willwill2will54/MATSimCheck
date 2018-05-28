@@ -128,12 +128,21 @@ def importer(extras, testing=False):
             self.dbs = dbs
             self.q = queue
 
+        def _debugprint(self, where):
+            if self.name == 'Finding avg of houseprice...':
+                print(where)
+
         def run(self):
+            self._debugprint('running')
             locks['matlock'].acquire()
+            self._debugprint('acquired')
             mats = self.dbs['table'].all()
+            self._debugprint('got')
             locks['matlock'].release()
+            self._debugprint('let go')
             for i, x in enumerate(mats):
                 self.q.put(self.function(x, self.dbs, locks))
+                self._debugprint('going')
 
     def lentest(t):
         return len(t) == 1
@@ -351,6 +360,7 @@ def importer(extras, testing=False):
         oldpc = pc
         if sum(thread.is_alive() for thread in threads) == 1:
             print('Hanging on', [thread.name for thread in threads if thread.is_alive()][0], flush=True)
+    print('shutting up shop')
     for x in [noncore, MATs, core, counties]:
         x.close()
     print('\a', flush=True)
