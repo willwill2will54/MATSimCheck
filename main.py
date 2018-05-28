@@ -99,7 +99,7 @@ Splits this many of the MATs into 2.''')
             poolsize = min([defs.corecount, len(tested)])
             with Pool(poolsize) as pool:
                 for result in pool.imap_unordered(partial(tester, table, algorithm=algorithm, number=num, testing=testing), tested):
-                    print('{} is most similar to {}'.format(x, ' then '.join(result[0])), flush=True)
+                    print('{} is most similar to {}'.format(tested, ' then '.join(result[0])), flush=True)
                     retresults.append((x, result[1]))
             if testing:
                 return retresults
@@ -110,7 +110,7 @@ Splits this many of the MATs into 2.''')
                     fields = sorted(list(chain(['Average ' + x, 'Subject ' + x] for x in defs.ProgressScoreHeaders)))
                     writer = csv.DictWriter(resultsfile, fieldnames=['MAT', ] + fields)
                     writer.writeheader()
-                    writer.writerows([{**{'MAT': x[0]}, **x[1][0], **x[1][1]} for x in results])
+                    writer.writerows([{**{'MAT': x[0]}, **x[1][0], **x[1][1]} for x in retresults])
                     msg.DONE()
 
     def testprep(matnum):
