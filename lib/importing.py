@@ -24,7 +24,7 @@ def importer(extras, testing=False):
     weblock = Manager.Lock()
     countylock = Manager.Lock()
     locks = Manager.dict()
-    queue = Manager.queue()
+    queue = Manager.Queue()
 
     noncore = TinyDB('./dbs/non_Core.json',)
     MATs = TinyDB('./dbs/MATS.json')
