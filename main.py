@@ -96,9 +96,9 @@ Splits this many of the MATs into 2.''')
             table = importer(importkeys, testing=testing)[0]
             retresults = []
             poolsize = min([defs.corecount, len(tested)])
-            testlamda = lambda x: tester(x, table, algorithm=algorithm, number=num, testing=testing)
+            testlamda = lambda inputthing: tester(inputthing, table, algorithm=algorithm, number=num, testing=testing)
             with Pool(poolsize) as pool:
-                results = pool.imap_unordered(testlamda, tested)
+                results = pool.map_unordered(testlamda, tested)
                 for result in results:
                     print('{} is most similar to {}'.format(x, ' then '.join(result[0])), flush=True)
                     retresults.append((x, result[1]))
