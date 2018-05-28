@@ -25,7 +25,7 @@ if _2 is not '':
 sys.setrecursionlimit(1500)
 
 # Gooey automatically generates a GUI
-@Gooey(program_name='MATSimCheck', image_dir='lib/img', monospace_display=True, progress_regex=r"^This is (\d+)% done$")
+@Gooey(program_name='MATSimCheck', image_dir='lib/img', monospace_display=True, progress_regex=r"^.+ is (\d+)% done$")
 def main():
     # Open the databases
     noncore = TinyDB('./dbs/non_Core.json')

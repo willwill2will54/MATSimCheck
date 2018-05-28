@@ -132,13 +132,8 @@ def importer(extras, testing=False):
             locks['matlock'].acquire()
             mats = self.dbs['table'].all()
             locks['matlock'].release()
-            pcvar = 100 / len(mats)
-            print('{} is {}% done'.format(self.name, 0), flush=True)
             for i, x in enumerate(mats):
                 self.q.put(self.function(x, self.dbs, locks))
-                pc = int(i * pcvar)
-                print('{} is {}% done'.format(self.name, pc))
-            print('{} is {}% done'.format(self.name, 100))
 
     def lentest(t):
         return len(t) == 1
@@ -333,9 +328,11 @@ def importer(extras, testing=False):
             threads.append(ThreadedProccessor(pricecheck, Message, queue))
         else:
             threads.append(ThreadedProccessor(operator(x, y), Message, queue))
+    taskpcfactor = 100 / (len(threads) * len(table.all()))
     for thread in threads:
         thread.start()
     done = 0
+    inserted = 0
     while done < 2:
         if all(not thread.is_alive() for thread in threads):
             done += 1
@@ -346,6 +343,9 @@ def importer(extras, testing=False):
         locks['matlock'].acquire()
         submitchanged(thang)
         locks['matlock'].release()
+        inserted += 1
+        pc = int(taskpcfactor * inserted)
+        Messages.PROGRESS('Compiling Variables', pc)
     for x in [noncore, MATs, core, counties]:
         x.close()
     print('\a', flush=True)
