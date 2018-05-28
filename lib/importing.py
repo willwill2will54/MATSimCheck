@@ -7,26 +7,24 @@ def importer(extras, testing=False):
     from collections import Counter
     from os import listdir
     import multiprocessing
+    import queue as q
     from multiprocessing.managers import BaseManager
     np.seterr(all='raise')
+
     class myManager(BaseManager):
         pass
 
     Manager = multiprocessing.Manager()
 
-    def submitchanged(changed):
-        for thang in changed:
-            table.update(thang, doc_ids=[thang.doc_id, ])
-        return []
-
-    myManager.register('submitchanged', submitchanged)
+    def submitchanged(thang):
+        table.update(thang, doc_ids=[thang.doc_id, ])
 
     corelock = Manager.Lock()
     matlock = Manager.Lock()
     weblock = Manager.Lock()
     countylock = Manager.Lock()
     locks = Manager.dict()
-    finished = Manager.Event()
+    queue = Manager.queue()
 
     noncore = TinyDB('./dbs/non_Core.json',)
     MATs = TinyDB('./dbs/MATS.json')
@@ -128,35 +126,24 @@ def importer(extras, testing=False):
 
     threads = []
 
-    submitchangedprox = MyManager.submitchanged
-
     class ThreadedProccessor(multiprocessing.Process):
-        def __init__(self, function, name):
+        def __init__(self, function, name, queue):
             multiprocessing.Process.__init__(self)
             self.function = function
             self.name = name
             self.dbs = dbs
-            submitchangedprox
+            self.q = queue
 
         def run(self):
             locks['matlock'].acquire()
             mats = self.dbs['table'].all()
             locks['matlock'].release()
-            changed = []
             pcvar = 100 / len(mats)
             print('{} is {}% done'.format(self.name, 0))
             for i, x in enumerate(mats):
-                changed.append(self.function(x, self.dbs, locks))
+                self.q.put(self.function(x, self.dbs, locks))
                 pc = int(i * pcvar)
                 print('{} is {}% done'.format(self.name, pc))
-                if locks['matlock'].acquire(blocking=False):
-                    submitchangedprox(changed)
-                    changed = []
-                    locks['matlock'].release()
-            if changed != []:
-                locks['matlock'].acquire()
-                submitchangedprox(changed)
-                locks['matlock'].release()
 
     def lentest(t):
         return len(t) == 1
@@ -342,21 +329,29 @@ def importer(extras, testing=False):
             process.append((y, z))
     for x, y in process:
         if (x, y) == ('geo', 'rmsd'):
-            threads.append(ThreadedProccessor(PCdist, Messages.PCDIST()))
+            threads.append(ThreadedProccessor(PCdist, Messages.PCDIST(), queue))
             continue
         Message = Messages.PARG(x, y)
         if (x, y) == ('trust', 'size'):
-            threads.append(ThreadedProccessor(sizecheck, Message))
+            threads.append(ThreadedProccessor(sizecheck, Message, queue))
         elif (x, y) == ('houseprice', 'avg'):
-            threads.append(ThreadedProccessor(pricecheck, Message))
+            threads.append(ThreadedProccessor(pricecheck, Message, queue))
         else:
-            threads.append(ThreadedProccessor(operator(x, y), Message))
+            threads.append(ThreadedProccessor(operator(x, y), Message, queue))
     MyManager.start()
     for thread in threads:
         thread.start()
-    for thread in threads:
-        thread.join()
-    finished.set()
+    done = 0
+    while done < 2:
+        if any(not thread.is_alive() for thread in threads):
+            done += 1
+        try:
+            thang = queue.get(timeout=2)
+        except q.Empty as e:
+            continue
+        locks['matlock'].acquire()
+        submitchanged(thang)
+        locks['matlock'].release()
     for x in [noncore, MATs, core, counties]:
         x.close()
     print('\a', flush=True)
