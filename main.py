@@ -4,6 +4,7 @@ import random
 import csv
 import os
 import itertools
+from multiproccessing import Pool
 from shlex import split as shlexsplit
 from itertools import product
 from collections import Counter
@@ -93,13 +94,16 @@ Splits this many of the MATs into 2.''')
             for a, b in zip(algorithm[:-3:4], algorithm[1:-2:4]):
                 importkeys += [a, b]
             table = importer(importkeys, testing=testing)[0]
-            results = []
-            for x in tested:
-                result = tester(x, table, algorithm=algorithm, number=num, testing=testing)
-                print('{} is most similar to {}'.format(x, ' then '.join(result[0])), flush=True)
-                results.append((x, result[1]))
+            retresults = []
+            poolsize = min([defs.corecount, len(tested)])
+            testlamda = lambda x: tester(x, table, algorithm=algorithm, number=num, testing=testing)
+            with Pool(poolsize) as pool:
+                results = pool.imap_unordered(testlamda, tested)
+                for result in results:
+                    print('{} is most similar to {}'.format(x, ' then '.join(result[0])), flush=True)
+                    retresults.append((x, result[1]))
             if testing:
-                return results
+                return retresults
             else:
                 with open('result.csv', 'w', encoding='utf-16') as resultsfile:
                     print('Writing results to file...', flush=True)

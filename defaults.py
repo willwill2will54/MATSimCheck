@@ -15,6 +15,9 @@ PostCodeKey = 'Postcode'
 ApiURL = 'http://api.postcodes.io/postcodes/'
 
 
+corecount = 8
+
+
 TestAlgorithmVariables = (range(4), ) * 5
 
 
