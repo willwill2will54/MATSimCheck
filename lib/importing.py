@@ -127,22 +127,22 @@ def importer(extras, testing=False):
             self.name = name
             self.dbs = dbs
             self.q = queue
+            self.where = 'initialised'
 
-        def _debugprint(self, where):
-            if self.name == 'Finding avg of houseprice...':
-                print(where)
+        def broken(self):
+            print(self.where, flush=True)
 
         def run(self):
-            self._debugprint('running')
+            self.where = 'running'
             locks['matlock'].acquire()
-            self._debugprint('acquired')
+            self.where = 'acquired'
             mats = self.dbs['table'].all()
-            self._debugprint('got')
+            self.where = 'got'
             locks['matlock'].release()
-            self._debugprint('let go')
+            self.where = 'let go'
             for i, x in enumerate(mats):
                 self.q.put(self.function(x, self.dbs, locks))
-                self._debugprint('going')
+                self.where = 'going'
 
     def lentest(t):
         return len(t) == 1
@@ -170,7 +170,7 @@ def importer(extras, testing=False):
                     assert cords2 is not None
                     break
                 except Exception as e:
-                    print(e)
+                    print(e, flush=True)
                     Messages.WebTrouble()
             locks['weblock'].release()
         if cords2 is not None:
@@ -182,11 +182,11 @@ def importer(extras, testing=False):
         for y in cords:
             countieslist.append(y['codes']['admin_county'])
         for y in countieslist:
+            locks['countylock'].acquire()
+            z = dbs['counties'].get(Query().CountyCode == y)
+            locks['countylock'].release()
             try:
-                locks['countylock'].acquire()
-                z = dbs['counties'].get(Query().CountyCode == y)
                 nums.append(int(z['MedianHousePrice']))
-                locks['countylock'].release()
             except TypeError:
                 pass
         try:
@@ -229,7 +229,7 @@ def importer(extras, testing=False):
                         assert cords3 is not None
                         break
                     except Exception as e:
-                        print(e)
+                        print(e, flush=True)
                         Messages.WebTrouble()
                 locks['weblock'].release()
             if cords3 is not None:
@@ -358,9 +358,6 @@ def importer(extras, testing=False):
         if pc != oldpc:
             Messages.PROGRESS('Compiling Variables', pc)
         oldpc = pc
-        if sum(thread.is_alive() for thread in threads) == 1:
-            print('Hanging on', [thread.name for thread in threads if thread.is_alive()][0], flush=True)
-    print('shutting up shop')
     for x in [noncore, MATs, core, counties]:
         x.close()
     print('\a', flush=True)
