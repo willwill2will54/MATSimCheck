@@ -8,11 +8,7 @@ def importer(extras, testing=False):
     from os import listdir
     import multiprocessing
     import queue as q
-    from multiprocessing.managers import BaseManager
     np.seterr(all='raise')
-
-    class myManager(BaseManager):
-        pass
 
     Manager = multiprocessing.Manager()
 
@@ -47,8 +43,6 @@ def importer(extras, testing=False):
 
     table = MATs.table(tablestring)
     dbs = {'noncore': noncore, 'MATs': MATs, 'core': core, 'counties': counties, 'table': table}
-    myManager.register('dbs', dbs)
-    MyManager = myManager()
     extras2 = extras + ['URN', ] + defs.ProgressScoreHeaders
     extras1 = extras
     import csv
@@ -144,6 +138,7 @@ def importer(extras, testing=False):
                 self.q.put(self.function(x, self.dbs, locks))
                 pc = int(i * pcvar)
                 print('{} is {}% done'.format(self.name, pc))
+            print('{} is {}% done'.format(self.name, 100))
 
     def lentest(t):
         return len(t) == 1
@@ -338,7 +333,6 @@ def importer(extras, testing=False):
             threads.append(ThreadedProccessor(pricecheck, Message, queue))
         else:
             threads.append(ThreadedProccessor(operator(x, y), Message, queue))
-    MyManager.start()
     for thread in threads:
         thread.start()
     done = 0
