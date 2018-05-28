@@ -91,17 +91,6 @@ Splits this many of the MATs into 2.''')
         if algorithm in (None, ['defaults', ], 'defaults'):
             algorithm = defs.algorithm
         if tested is not None:
-
-            class lambdaworkaround(object):
-                def __init__(self, table, algorithm, number, testing):
-                    self.table = table
-                    self.algorithm = algorithm
-                    self.number = number
-                    self.testing = testing
-
-                def __call__(self, inputthing):
-                    tester(inputthing, self.table, algorithm=self.algorithm, number=self.number, testing=self.testing)
-
             importkeys = []
             for a, b in zip(algorithm[:-3:4], algorithm[1:-2:4]):
                 importkeys += [a, b]
