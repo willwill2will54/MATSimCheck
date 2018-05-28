@@ -74,7 +74,7 @@ def main():
 Splits this many of the MATs into 2.''')
 
     args = parser.parse_args()
-    msg.SEP
+    msg.SEP()
     if args.action == 'Purge':
         msg.PURGE()
         for x in [core, noncore, counties, MATs]:
