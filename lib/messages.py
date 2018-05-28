@@ -2,6 +2,12 @@ def ALREADYIMPORT(a):
     print('This version of {} has already been imported. Skipping...'.format(a), flush=True)
 
 
+def SEP():
+    print('\
+--------------------------------------\
+**************************************\
+--------------------------------------')
+
 def IMPORT(a):
     print('Importing {} files...'.format(a), flush=True)
 
