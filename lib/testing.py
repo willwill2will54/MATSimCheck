@@ -1,4 +1,4 @@
-def tester(MAT, table, algorithm=['geormsd', 'wgt', '500'], number=None, testing=False):
+def tester(table, MAT, algorithm=['geormsd', 'wgt', '500'], number=None, testing=False):
     from collections import Counter
     from tinydb import TinyDB, Query
     from pprint import pprint
