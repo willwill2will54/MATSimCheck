@@ -3,11 +3,9 @@ def ALREADYIMPORT(a):
 
 
 def SEP():
-    print('''
---------------------------------------
-**************************************
---------------------------------------
-''')
+    num = 80
+    print("".join(['-' * num, '\n', '*' * num, '\n', '-' * num]))
+
 
 def IMPORT(a):
     print('Importing {} files...'.format(a), flush=True)

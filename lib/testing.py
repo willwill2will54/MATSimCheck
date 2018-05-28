@@ -127,7 +127,7 @@ then try again if you want to use this variable.'.format(key), flush=True)
                 subjectavg['Subject' + x] = 'NaN'
         lastthing = (subjectavg, resultavg)
 
-    return (['{} (Score: {}%)'.format(a, b) for a, b in finlist[:number]], lastthing, tested)
+    return (['{} (Score: {}%)'.format(a, b) for a, b in finlist[:number]], lastthing, MAT)
     """for x in cand:
         if x['sims'] == simsmin:
             return x"""

@@ -76,7 +76,7 @@ def importer(extras, testing=False):
                                       "IDs": list(set(Mat_in))}, Query()['Trust name'] == x[defs.MatNameKey])
                         pc = int((((i + 1) ** 2) / maxthing) * 100)
                         if pc != lastpc:
-                            Messages.PROGRESS('This', pc)
+                            Messages.PROGRESS('Initialising school database', pc)
                             lastpc = pc
                     break
             except UnicodeError:
