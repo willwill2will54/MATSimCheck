@@ -333,6 +333,7 @@ def importer(extras, testing=False):
         thread.start()
     done = 0
     inserted = 0
+    oldpc = 100
     while done < 2:
         if all(not thread.is_alive() for thread in threads):
             done += 1
@@ -345,7 +346,11 @@ def importer(extras, testing=False):
         locks['matlock'].release()
         inserted += 1
         pc = int(taskpcfactor * inserted)
-        Messages.PROGRESS('Compiling Variables', pc)
+        if pc != oldpc:
+            Messages.PROGRESS('Compiling Variables', pc)
+        oldpc = pc
+        if sum(thread.is_alive() for thread in threads) == 1:
+            print('Hanging on', [thread.name for thread in threads if thread.is_alive()][0], flush=True)
     for x in [noncore, MATs, core, counties]:
         x.close()
     print('\a', flush=True)
