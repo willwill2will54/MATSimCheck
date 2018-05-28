@@ -139,7 +139,7 @@ def importer(extras, testing=False):
             mats = self.dbs['table'].all()
             locks['matlock'].release()
             pcvar = 100 / len(mats)
-            print('{} is {}% done'.format(self.name, 0))
+            print('{} is {}% done'.format(self.name, 0), flush=True)
             for i, x in enumerate(mats):
                 self.q.put(self.function(x, self.dbs, locks))
                 pc = int(i * pcvar)
