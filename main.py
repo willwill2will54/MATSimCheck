@@ -4,7 +4,7 @@ import random
 import csv
 import os
 import itertools
-from multiproccessing import Pool
+from multiprocessing import Pool
 from shlex import split as shlexsplit
 from itertools import product
 from collections import Counter
