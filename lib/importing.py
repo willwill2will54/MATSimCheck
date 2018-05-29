@@ -51,7 +51,7 @@ def importer(extras, testing=False):
     Messages.IMPORT('core')
     for num, file in enumerate([each for each in listdir(coredir) if each.endswith('.csv')]):
         Messages.WORKING(file, num + 1, len1)
-        lastpc = 0
+        lastpc = 1
         for encoding in ['utf-8', 'utf-16', 'Windows-1252']:
             try:
                 openfile = open(coredir + '/' + file, encoding=encoding)
