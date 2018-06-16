@@ -118,10 +118,10 @@ Splits this many of the MATs into 2.''')
     def testprep(matnum):
         for encoding in ['utf-8', 'utf-16', 'Windows-1252']:
             try:
-                openfile = open(defs.CoreDirectory + '/Core.csv', encoding=encoding)
+                openfile = open(defs.CoreDirectory + '/core.csv', encoding=encoding)
                 openfile.read()
                 openfile.close()
-                with open(defs.CoreDirectory + '/Core.csv', newline='', encoding=encoding) as donor:
+                with open(defs.CoreDirectory + '/core.csv', newline='', encoding=encoding) as donor:
                     raw = csv.DictReader(donor, delimiter=',')
                     dicts = [dict(row) for row in raw]
                     break
