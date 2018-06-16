@@ -61,4 +61,4 @@ def operator(key, operation):
                 pass
             return (x, [])
         func = lambda dbs, t: med(t, key, dbs)
-    return
+    return func

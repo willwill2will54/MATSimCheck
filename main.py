@@ -97,7 +97,7 @@ Splits this many of the MATs into 2.''')
                 importkeys += [a, b]
             table = importer(importkeys, testing=testing)[0]
             retresults = []
-            with multiprocessing.pool.Pool() as pool:
+            with multiprocessing.Pool() as pool:
                 partthing = partial(tester, table, algorithm=algorithm, number=num, testing=testing)
                 for result in pool.imap_unordered(partthing, tested):
                     print('{} is most similar to {}\n'.format(result[2], ' then '.join(result[0])), flush=True)

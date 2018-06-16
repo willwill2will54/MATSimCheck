@@ -1,28 +1,35 @@
+def _running(dbs, funcs, mat):
+        import defaults as defs
+
+        corechanged = []
+        for func in funcs:
+            mat, newchanged = func(dbs, mat)
+            for changed in newchanged:
+                changedkey = next(x for x, y in dbs['core'].items() if y[defs.PostCodeKey] == changed[1])
+                dbs['core'][changedkey].update(changed[0])
+                corechanged.append(dbs['core'][changedkey])
+        return mat, corechanged
+
+
 def importer(extras, testing=False):
     import lib.messages as Messages
     from tinydb import TinyDB, Query
     import numpy as np
     from lib.misc import getpostcodes
     import defaults as defs
-    from collections import Counter
     from os import listdir
-    import multiprocessing
-    import queue as q
+    import pathos
     from functools import partial
     from lib.operations import operator
     np.seterr(all='raise')
 
-    Manager = multiprocessing.Manager()
-
     def submitchanged(thang):
         table.update(thang, doc_ids=[thang.doc_id, ])
-
-    queue = Manager.Queue()
 
     noncore = TinyDB('./dbs/non_Core.json',)
     MATs = TinyDB('./dbs/MATS.json')
     core = TinyDB('./dbs/Core.json')
-    counties = TinyDB('./dbs/Counties.json')
+    district = TinyDB('./dbs/district.json')
 
     tablestring = '|'.join(x for x in extras)
     if testing:
@@ -38,7 +45,7 @@ def importer(extras, testing=False):
         Messages.TABLESTRING(tablestring)
 
     table = MATs.table(tablestring)
-    dbs = {'noncore': noncore, 'MATs': MATs, 'core': core, 'counties': counties, 'table': table}
+    dbs = {'noncore': noncore, 'MATs': MATs, 'core': core, 'district': district, 'table': table}
     extras2 = extras + ['URN', ] + defs.ProgressScoreHeaders
     extras1 = extras
     import csv
@@ -112,30 +119,8 @@ def importer(extras, testing=False):
     with open('./special/HousePrices.csv') as openfile:
         raw = csv.DictReader(openfile, delimiter=',')
         dicts = [dict(row) for row in raw]
-        counties.purge()
-        counties.insert_multiple(dicts)
-
-    threads = []
-
-    class ThreadedProccessor(multiprocessing.Process):
-        def __init__(self, function, name, queue):
-            multiprocessing.Process.__init__(self)
-            self.function = function
-            self.name = name
-            self.dbs = dbs
-            self.q = queue
-            self.where = 'initialised'
-            self.mats = self.dbs['table'].all()
-            self.core = {str(x.doc_id): x for x in self.dbs['core'].all()}
-
-        def broken(self):
-            print(self.where, flush=True)
-
-        def run(self):
-            self.where = 'running'
-            for x in self.mats:
-                self.q.put(self.function(x, self.dbs, self.core))
-                self.where = 'going'
+        district.purge()
+        district.insert_multiple(dicts)
 
     def lentest(t):
         return len(t) == 1
@@ -143,9 +128,9 @@ def importer(extras, testing=False):
     table.remove(Query().IDs.test(lentest))
     Messages.PARGS()
 
-    def pricecheck(dbs, t):
+    def pricecheck(dbs, x):
 
-        countieslist, nums, cords, postcodes = [], [], [], []
+        districtlist, nums, cords, postcodes = [], [], [], []
         for ID in x['IDs']:
             y = dbs['core'][str(ID)]
             if 'cord' in y:
@@ -168,10 +153,12 @@ def importer(extras, testing=False):
                     corechanged.append(({'cord': cord}, cord['postcode']))
                 cords += cords2
         for y in cords:
-            countieslist.append(y['codes']['admin_county'])
-        for y in countieslist:
-            z = dbs['counties'][y]
+            districtlist.append(y['codes']['admin_district'])
+        for y in districtlist:
+            z = dbs['district'][y]
             try:
+                if type(z['MedianHousePrice']) is str:
+                    z['MedianHousePrice'] = z['MedianHousePrice'].replace(',', '')
                 nums.append(int(z['MedianHousePrice']))
             except TypeError:
                 pass
@@ -181,13 +168,13 @@ def importer(extras, testing=False):
             pass
         return (x, corechanged)
 
-    def sizecheck(dbs, t):
+    def sizecheck(dbs, x):
             if 'trustsize' in x:
                 return x
             x['trustsize'] = len(x['IDs'])
-            return x
+            return (x, ())
 
-    def PCdist(dbs, t):
+    def PCdist(dbs, x):
             if 'geormsd' in x:
                 return x
             IDs = x['IDs']
@@ -236,41 +223,14 @@ def importer(extras, testing=False):
     for y, z in zip(extras1[:-1:], extras1[1::]):
         if z in ops:
             process.append((y, z))
-    for x, y in process:
-        if (x, y) == ('geo', 'rmsd'):
-            threads.append(ThreadedProccessor(PCdist, Messages.PCDIST(), queue))
-            continue
-        Message = Messages.PARG(x, y)
-        if (x, y) == ('trust', 'size'):
-            threads.append(ThreadedProccessor(sizecheck, Message, queue))
-        elif (x, y) == ('houseprice', 'avg'):
-            threads.append(ThreadedProccessor(pricecheck, Message, queue))
-        else:
-            threads.append(ThreadedProccessor(operator(x, y), Message, queue))
-    taskpcfactor = 100 / (len(threads) * len(table.all()))
-    for thread in threads:
-        thread.start()
-    done = 0
-    inserted = 0
-    oldpc = 100
     listofmats = dbs['table'].all()
-
-    def running(dbs, funcs, mat):
-        corechanged = []
-        for func in funcs:
-            mat, newchanged = func(dbs, mat)
-            for changed in newchanged:
-                changedkey = next(x for x, y in dbs['core'].items() if y[defs.PostCodeKey] == changed[1])
-                dbs['core'][changedkey].update(changed[0])
-                corechanged.append(dbs['core'][changedkey])
-        return mat, corechanged
 
     coredict = {str(x.doc_id): x for x in dbs['core'].all()}
-    countydict = {x['CountyCode']: x for x in dbs['counties'].all()}
-    dictdbs = {'counties': countydict, 'core': coredict}
+    districtdict = {x['LACode']: x for x in dbs['district'].all()}
+    dictdbs = {'district': districtdict, 'core': coredict}
     listofmats = dbs['table'].all()
 
-    with multiprocessing.pool.Pool() as p:
+    with pathos.multiprocessing.ProcessPool() as p:
         funcs = []
         for x, y in process:
             if (x, y) == ('geo', 'rmsd'):
@@ -281,33 +241,22 @@ def importer(extras, testing=False):
                 funcs.append(pricecheck)
             else:
                 funcs.append(operator(x, y))
-        thefunction = partial(running, dictdbs)
-        mapthing = p.imap_unordered(thefunction, listofmats)
+        thefunction = partial(_running, dictdbs, funcs)
+        mapthing = p.uimap(thefunction, listofmats)
         pcfactor = 100 / len(listofmats)
-        for i, result, corechanged in enumerate(mapthing):
+        pc = 0
+        Messages.PROGRESS('Compiling Variables', pc)
+        for i, thang in enumerate(mapthing):
+            result, corechanged = thang[0], thang[1]
             submitchanged(result)
             for changed in corechanged:
-                dbs['core'].update(changed, doc_id=changed.doc_id)
-            pc = round(i * pcfactor)
+                dbs['core'].update(changed, doc_ids=[changed.doc_id, ])
+            pc = round((i + 1) * pcfactor)
             Messages.PROGRESS('Compiling Variables', pc)
 
-
-    while done < 2:
-        if all(not thread.is_alive() for thread in threads):
-            done += 1
-        try:
-            thang = queue.get(timeout=2)
-        except q.Empty as e:
-            continue
-        submitchanged(thang)
-        inserted += 1
-        pc = int(taskpcfactor * inserted)
-        if pc != oldpc:
-            Messages.PROGRESS('Compiling Variables', pc)
-        oldpc = pc
-    for x in [noncore, MATs, core, counties]:
+    for x in [noncore, MATs, core, district]:
         x.close()
-    print('\a', flush=True)
+    Messages.ALERT()
     return (tablestring, False)
 
 

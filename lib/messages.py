@@ -62,3 +62,7 @@ def TABLESTRING(tablestring):
 
 def PROGRESS(thing, pc):
     print('{} is {}% done'.format(thing, pc), flush=True)
+
+
+def ALERT():
+    print('\a', flush=True)

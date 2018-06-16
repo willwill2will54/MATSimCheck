@@ -3,3 +3,11 @@
 *.json
 dbs/Core.json
 dbs/MATS.json
+*.pyc
+lib/__pycache__/importing.cpython-36.pyc
+lib/__pycache__/messages.cpython-36.pyc
+*.pyc
+lib/__pycache__/misc.cpython-36.pyc
+lib/__pycache__/testing.cpython-36.pyc
+lib/__pycache__/messages.cpython-36.pyc
+lib/__pycache__/importing.cpython-36.pyc

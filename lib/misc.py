@@ -1,7 +1,7 @@
 def getpostcodes(postcodes):
     import requests
     import requests_cache
-    requests_cache.install_cache('postcodecache')
+    requests_cache.install_cache('lib/postcodecache')
 
     from defaults import ApiURL
     try:

@@ -14,7 +14,7 @@ MatNameKey = 'Trusts (name)'
 # Heading of the postcode field in the data
 PostCodeKey = 'Postcode'
 # URL of the postcodes.io API
-ApiURL = 'http://localhost:8000/postcodes/'
+ApiURL = 'http://postcodes.io/postcodes/'
 
 
 threadcount = multiprocessing.cpu_count()
