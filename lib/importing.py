@@ -8,6 +8,8 @@ def importer(extras, testing=False):
     from os import listdir
     import multiprocessing
     import queue as q
+    from functools import partial
+    from lib.operations import operator
     np.seterr(all='raise')
 
     Manager = multiprocessing.Manager()
@@ -15,11 +17,6 @@ def importer(extras, testing=False):
     def submitchanged(thang):
         table.update(thang, doc_ids=[thang.doc_id, ])
 
-    corelock = Manager.Lock()
-    matlock = Manager.Lock()
-    weblock = Manager.Lock()
-    countylock = Manager.Lock()
-    locks = Manager.dict()
     queue = Manager.Queue()
 
     noncore = TinyDB('./dbs/non_Core.json',)
@@ -27,7 +24,6 @@ def importer(extras, testing=False):
     core = TinyDB('./dbs/Core.json')
     counties = TinyDB('./dbs/Counties.json')
 
-    locks = {'matlock': matlock, 'weblock': weblock, 'countylock': countylock, 'corelock': corelock}
     tablestring = '|'.join(x for x in extras)
     if testing:
         tablestring += '**testdataset**'
@@ -60,7 +56,7 @@ def importer(extras, testing=False):
                 with open(coredir + '/' + file, 'r', encoding=encoding) as openfile:
                     raw = csv.DictReader(openfile, delimiter=',')
                     dicts = [dict(row) for row in raw]
-                    maxthing = len(dicts) ** 2
+                    maxthing = len(dicts)
                     for i, x in enumerate(dicts):
                         urn = x['URN']
                         urns.append(urn)
@@ -74,7 +70,7 @@ def importer(extras, testing=False):
                             pass
                         table.upsert({"Trust name": x[defs.MatNameKey],
                                       "IDs": list(set(Mat_in))}, Query()['Trust name'] == x[defs.MatNameKey])
-                        pc = int((((i + 1) ** 2) / maxthing) * 100)
+                        pc = int(((i + 1) / maxthing) * 100)
                         if pc != lastpc:
                             Messages.PROGRESS('Initialising school database', pc)
                             lastpc = pc
@@ -94,6 +90,7 @@ def importer(extras, testing=False):
                 with open(noncoredir + '/' + file, encoding=encoding) as openfile:
                     raw = csv.DictReader(openfile, delimiter=',')
                     dicts = [dict(row) for row in raw]
+                    maxthing = len(dicts)
                     keys = set()
                     for i, x in enumerate(dicts):
                         urn = x['URN']
@@ -104,7 +101,7 @@ def importer(extras, testing=False):
                                 del x[d]
                             noncore.upsert(x, Query().URN == urn)
                             core.update(x, Query().URN == urn)
-                        pc = int((((i + 1) ** 2) / maxthing) * 100)
+                        pc = int(((i + 1) / maxthing) * 100)
                         if pc != lastpc:
                             Messages.PROGRESS('This', pc)
                             lastpc = pc
@@ -128,20 +125,16 @@ def importer(extras, testing=False):
             self.dbs = dbs
             self.q = queue
             self.where = 'initialised'
+            self.mats = self.dbs['table'].all()
+            self.core = {str(x.doc_id): x for x in self.dbs['core'].all()}
 
         def broken(self):
             print(self.where, flush=True)
 
         def run(self):
             self.where = 'running'
-            locks['matlock'].acquire()
-            self.where = 'acquired'
-            mats = self.dbs['table'].all()
-            self.where = 'got'
-            locks['matlock'].release()
-            self.where = 'let go'
-            for i, x in enumerate(mats):
-                self.q.put(self.function(x, self.dbs, locks))
+            for x in self.mats:
+                self.q.put(self.function(x, self.dbs, self.core))
                 self.where = 'going'
 
     def lentest(t):
@@ -150,20 +143,17 @@ def importer(extras, testing=False):
     table.remove(Query().IDs.test(lentest))
     Messages.PARGS()
 
-    def pricecheck(x, dbs, locks):
+    def pricecheck(dbs, t):
 
         countieslist, nums, cords, postcodes = [], [], [], []
         for ID in x['IDs']:
-            locks['corelock'].acquire()
-            y = dbs['core'].get(doc_id=ID)
-            locks['corelock'].release()
+            y = dbs['core'][str(ID)]
             if 'cord' in y:
                 cords.append(y['cord'])
             else:
                 postcodes.append(y[defs.PostCodeKey])
         cords2 = None
         if postcodes != []:
-            locks['weblock'].acquire()
             while True:
                 try:
                     cords2 = getpostcodes(postcodes)
@@ -172,19 +162,15 @@ def importer(extras, testing=False):
                 except Exception as e:
                     print(e, flush=True)
                     Messages.WebTrouble()
-            locks['weblock'].release()
+        corechanged = []
         if cords2 is not None:
-                locks['corelock'].acquire()
                 for cord in cords2:
-                    dbs['core'].update({'cord': cord}, Query()[defs.PostCodeKey] == cord['postcode'])
-                locks['corelock'].release()
+                    corechanged.append(({'cord': cord}, cord['postcode']))
                 cords += cords2
         for y in cords:
             countieslist.append(y['codes']['admin_county'])
         for y in countieslist:
-            locks['countylock'].acquire()
-            z = dbs['counties'].get(Query().CountyCode == y)
-            locks['countylock'].release()
+            z = dbs['counties'][y]
             try:
                 nums.append(int(z['MedianHousePrice']))
             except TypeError:
@@ -193,15 +179,15 @@ def importer(extras, testing=False):
             x['housepriceavg'] = np.average(np.array(nums))
         except Exception:
             pass
-        return x
+        return (x, corechanged)
 
-    def sizecheck(x, dbs, locks):
+    def sizecheck(dbs, t):
             if 'trustsize' in x:
                 return x
             x['trustsize'] = len(x['IDs'])
             return x
 
-    def PCdist(x, dbs, locks):
+    def PCdist(dbs, t):
             if 'geormsd' in x:
                 return x
             IDs = x['IDs']
@@ -210,9 +196,7 @@ def importer(extras, testing=False):
             for ID in IDs:
                 try:
                     try:
-                        locks['corelock'].acquire()
-                        IDData = dbs['core'].get(doc_id=ID)
-                        locks['corelock'].release()
+                        IDData = dbs['core'][str(ID)]
                     except TypeError:
                         print(ID, flush=True)
                         raise
@@ -221,8 +205,8 @@ def importer(extras, testing=False):
                     Postcodes.append((ID, IDData[defs.PostCodeKey]))
                 except KeyError:
                     raise
+            cords3 = None
             if Postcodes != []:
-                locks['weblock'].acquire()
                 while True:
                     try:
                         cords3 = getpostcodes(Postcodes)
@@ -231,12 +215,10 @@ def importer(extras, testing=False):
                     except Exception as e:
                         print(e, flush=True)
                         Messages.WebTrouble()
-                locks['weblock'].release()
+            corechanged = []
             if cords3 is not None:
-                locks['corelock'].acquire()
                 for cord in cords3:
-                    dbs['core'].update({'cord': cord}, Query()[defs.PostCodeKey] == cord['postcode'])
-                locks['corelock'].release()
+                    corechanged.append(({'cord': cord}, cord['postcode']))
                 cords2 += cords3
             cords = [(x['northings'], x['eastings']) for x in cords2]
             cordsa = np.array(cords)
@@ -247,80 +229,8 @@ def importer(extras, testing=False):
                 pass
             except Exception:
                 pass
-            return x
+            return (x, corechanged)
 
-    def operator(key, operation):
-        if operation == 'avg':
-            def avg(x, key, dbs, locks):
-                if key + 'avg' in x:
-                    return x
-                nums = []
-                locks['corelock'].acquire()
-                for ID in x['IDs']:
-                    nums.append(float(dbs['core'].get(doc_id=ID)[key]))
-                locks['corelock'].release()
-                try:
-                    x[key + 'avg'] = np.average(np.array(nums))
-                except Exception:
-                    pass
-                return x
-            func = lambda t, dbs, locks: avg(t, key, dbs, locks)
-        elif operation == 'rmsd':
-            def rmsd(x, key, dbs, locks):
-                if key + 'rmsd' in x:
-                    return x
-                array = np.array([])
-                nums = []
-                locks['corelock'].acquire()
-                for ID in x['IDs']:
-                    nums.append(float(dbs['core'].get(doc_id=ID)[key]))
-                locks['corelock'].release()
-                array = np.append(array, nums)
-                try:
-                    x[key + 'rmsd'] = np.std(array)
-                except Exception:
-                    pass
-                return x
-            func = lambda t, dbs, locks: rmsd(t, key, dbs, locks)
-        elif operation == 'mode':
-            def mode(x, key, dbs, locks):
-                if key + 'mode' in x:
-                    return x
-                locks['corelock'].acquire()
-                stuff = [dbs['core'].get(doc_id=ID)[key] for ID in x['IDs']]
-                locks['corelock'].release()
-                x[key + 'mode'] = Counter(stuff).most_common(1)[0][0]
-                return x
-            func = lambda t, dbs, locks: mode(t, key, dbs, locks)
-        elif operation == 'rng':
-            def rng(x, key, dbs, locks):
-                if key + 'rng' in x:
-                    return x
-                locks['corelock'].acquire()
-                stuff = [dbs['core'].get(doc_id=ID)[key] for ID in x['IDs']]
-                locks['corelock'].release()
-                x[key + 'rng'] = max(stuff) - min(stuff)
-                return x
-            func = lambda t, dbs, locks: rng(t, key, dbs, locks)
-        elif operation == 'med':
-            def med(x, key, dbs, locks):
-                try:
-                    if key + 'med' in x:
-                        return x
-                    nums = []
-                    locks['corelock'].acquire()
-                    for ID in x['IDs']:
-                        nums.append(float(dbs['core'].get(doc_id=ID)[key]))
-                    locks['corelock'].release()
-                    try:
-                        x[key + 'med'] = np.median(np.array(nums))
-                    except Exception:
-                        pass
-                except Exception:
-                    pass
-                return x
-            func = lambda t, dbs, locks: med(t, key, dbs, locks)
-        return func
     process = []
     ops = ['avg', 'rmsd', 'med', 'rng', 'mode', 'size']
     for y, z in zip(extras1[:-1:], extras1[1::]):
@@ -343,6 +253,45 @@ def importer(extras, testing=False):
     done = 0
     inserted = 0
     oldpc = 100
+    listofmats = dbs['table'].all()
+
+    def running(dbs, funcs, mat):
+        corechanged = []
+        for func in funcs:
+            mat, newchanged = func(dbs, mat)
+            for changed in newchanged:
+                changedkey = next(x for x, y in dbs['core'].items() if y[defs.PostCodeKey] == changed[1])
+                dbs['core'][changedkey].update(changed[0])
+                corechanged.append(dbs['core'][changedkey])
+        return mat, corechanged
+
+    coredict = {str(x.doc_id): x for x in dbs['core'].all()}
+    countydict = {x['CountyCode']: x for x in dbs['counties'].all()}
+    dictdbs = {'counties': countydict, 'core': coredict}
+    listofmats = dbs['table'].all()
+
+    with multiprocessing.pool.Pool() as p:
+        funcs = []
+        for x, y in process:
+            if (x, y) == ('geo', 'rmsd'):
+                funcs.append(PCdist)
+            elif (x, y) == ('trust', 'size'):
+                funcs.append(sizecheck)
+            elif (x, y) == ('houseprice', 'avg'):
+                funcs.append(pricecheck)
+            else:
+                funcs.append(operator(x, y))
+        thefunction = partial(running, dictdbs)
+        mapthing = p.imap_unordered(thefunction, listofmats)
+        pcfactor = 100 / len(listofmats)
+        for i, result, corechanged in enumerate(mapthing):
+            submitchanged(result)
+            for changed in corechanged:
+                dbs['core'].update(changed, doc_id=changed.doc_id)
+            pc = round(i * pcfactor)
+            Messages.PROGRESS('Compiling Variables', pc)
+
+
     while done < 2:
         if all(not thread.is_alive() for thread in threads):
             done += 1
@@ -350,9 +299,7 @@ def importer(extras, testing=False):
             thang = queue.get(timeout=2)
         except q.Empty as e:
             continue
-        locks['matlock'].acquire()
         submitchanged(thang)
-        locks['matlock'].release()
         inserted += 1
         pc = int(taskpcfactor * inserted)
         if pc != oldpc:

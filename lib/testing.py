@@ -119,12 +119,12 @@ then try again if you want to use this variable.'.format(key), flush=True)
             if len(y) > 0:
                 resultavg['Average ' + x] = round(np.average(np.array(y)), 2)
             else:
-                resultavg['Average' + x] = 'NaN'
+                resultavg['Average ' + x] = 'NaN'
         for x, y in dict2.items():
             if len(y) > 0:
                 subjectavg['Subject ' + x] = round(np.average(np.array(y)), 2)
             else:
-                subjectavg['Subject' + x] = 'NaN'
+                subjectavg['Subject ' + x] = 'NaN'
         lastthing = (subjectavg, resultavg)
 
     return (['{} (Score: {}%)'.format(a, b) for a, b in finlist[:number]], lastthing, MAT)

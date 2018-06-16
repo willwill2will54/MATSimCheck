@@ -1,5 +1,8 @@
 def getpostcodes(postcodes):
     import requests
+    import requests_cache
+    requests_cache.install_cache('postcodecache')
+
     from defaults import ApiURL
     try:
         import ujson

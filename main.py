@@ -4,7 +4,7 @@ import random
 import csv
 import os
 import itertools
-from multiprocessing import Pool
+import multiprocessing
 from shlex import split as shlexsplit
 from itertools import product
 from collections import Counter
@@ -74,6 +74,7 @@ def main():
 Splits this many of the MATs into 2.''')
 
     args = parser.parse_args()
+
     msg.SEP()
     if args.action == 'Purge':
         msg.PURGE()
@@ -96,11 +97,10 @@ Splits this many of the MATs into 2.''')
                 importkeys += [a, b]
             table = importer(importkeys, testing=testing)[0]
             retresults = []
-            poolsize = min([defs.corecount, len(tested)])
-            with Pool(poolsize) as pool:
+            with multiprocessing.pool.Pool() as pool:
                 partthing = partial(tester, table, algorithm=algorithm, number=num, testing=testing)
                 for result in pool.imap_unordered(partthing, tested):
-                    print('{} is most similar to {}'.format(result[2], ' then '.join(result[0])), flush=True)
+                    print('{} is most similar to {}\n'.format(result[2], ' then '.join(result[0])), flush=True)
                     retresults.append((result[2], result[1]))
             if testing:
                 return retresults
@@ -111,7 +111,8 @@ Splits this many of the MATs into 2.''')
                     fields = sorted(list(chain(['Average ' + x, 'Subject ' + x] for x in defs.ProgressScoreHeaders)))
                     writer = csv.DictWriter(resultsfile, fieldnames=['MAT', ] + fields)
                     writer.writeheader()
-                    writer.writerows([{**{'MAT': x[0]}, **x[1][0], **x[1][1]} for x in retresults])
+                    rows = [{**{'MAT': x[0]}, **x[1][0], **x[1][1]} for x in retresults]
+                    writer.writerows(rows)
                     msg.DONE()
 
     def testprep(matnum):
@@ -206,4 +207,5 @@ Splits this many of the MATs into 2.''')
             normfunc()
 
 
-main()
+if __name__ == '__main__':
+    main()

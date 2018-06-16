@@ -1,3 +1,5 @@
+import multiprocessing
+
 algorithm = [
     'trust', 'size', 'wgt', '1',
     'geo', 'rmsd', 'wgt', '1',
@@ -12,10 +14,10 @@ MatNameKey = 'Trusts (name)'
 # Heading of the postcode field in the data
 PostCodeKey = 'Postcode'
 # URL of the postcodes.io API
-ApiURL = 'http://api.postcodes.io/postcodes/'
+ApiURL = 'http://localhost:8000/postcodes/'
 
 
-corecount = 8
+threadcount = multiprocessing.cpu_count()
 
 
 TestAlgorithmVariables = (range(4), ) * 5

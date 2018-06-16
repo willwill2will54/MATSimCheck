@@ -20,7 +20,7 @@ def PURGE():
 
 
 def DONE():
-    print("Purging all databases...", flush=True)
+    print("Done!", flush=True)
 
 
 def TRY(a):
