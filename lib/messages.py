@@ -4,7 +4,7 @@ def ALREADYIMPORT(a):
 
 def SEP():
     num = 80
-    print("".join(['-' * num, '\n', '*' * num, '\n', '-' * num]))
+    print("".join(['-' * num, '\n', '*' * num, '\n', '-' * num]), flush=True)
 
 
 def IMPORT(a):

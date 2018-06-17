@@ -73,10 +73,13 @@ def importer(extras, testing=False):
                         try:
                             search = table.search(Query()['Trust name'] == x[defs.MatNameKey])
                             Mat_in.extend([x for x in search[0]['IDs']])
-                        except Exception:
-                            pass
-                        table.upsert({"Trust name": x[defs.MatNameKey],
-                                      "IDs": list(set(Mat_in))}, Query()['Trust name'] == x[defs.MatNameKey])
+                            Matid = search[0].doc_id
+                        except IndexError:
+                            table.insert({"Trust name": x[defs.MatNameKey],
+                                          "IDs": list(set(Mat_in))})
+                        else:
+                            table.update({"Trust name": x[defs.MatNameKey], "IDs": list(set(Mat_in))},
+                                         doc_ids=[Matid, ])
                         pc = int(((i + 1) / maxthing) * 100)
                         if pc != lastpc:
                             Messages.PROGRESS('Initialising school database', pc)
