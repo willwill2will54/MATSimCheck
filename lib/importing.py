@@ -247,6 +247,7 @@ def importer(extras, testing=False):
         thefunction = partial(_running, dictdbs, funcs)
         mapthing = p.uimap(thefunction, listofmats)
         pcfactor = 100 / len(listofmats)
+        oldpc = 0
         pc = 0
         Messages.PROGRESS('Compiling Variables', pc)
         for i, thang in enumerate(mapthing):
@@ -255,7 +256,9 @@ def importer(extras, testing=False):
             for changed in corechanged:
                 dbs['core'].update(changed, doc_ids=[changed.doc_id, ])
             pc = round((i + 1) * pcfactor)
-            Messages.PROGRESS('Compiling Variables', pc)
+            if pc != oldpc:
+                Messages.PROGRESS('Compiling Variables', pc)
+            oldpc = pc
 
     for x in [noncore, MATs, core, district]:
         x.close()
