@@ -11,3 +11,7 @@ lib/__pycache__/misc.cpython-36.pyc
 lib/__pycache__/testing.cpython-36.pyc
 lib/__pycache__/messages.cpython-36.pyc
 lib/__pycache__/importing.cpython-36.pyc
+dbs/Core.json
+dbs/Counties.json
+dbs/MATS.json
+dbs/non_Core.json

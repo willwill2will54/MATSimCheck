@@ -18,7 +18,7 @@ def importer(extras, testing=False):
     from lib.misc import getpostcodes
     import defaults as defs
     from os import listdir
-    import pathos
+    import multiprocess
     from functools import partial
     from lib.operations import operator
     np.seterr(all='raise')
@@ -233,7 +233,7 @@ def importer(extras, testing=False):
     dictdbs = {'district': districtdict, 'core': coredict}
     listofmats = dbs['table'].all()
 
-    with pathos.multiprocessing.ProcessPool() as p:
+    with multiprocess.Pool() as p:
         funcs = []
         for x, y in process:
             if (x, y) == ('geo', 'rmsd'):
@@ -245,7 +245,7 @@ def importer(extras, testing=False):
             else:
                 funcs.append(operator(x, y))
         thefunction = partial(_running, dictdbs, funcs)
-        mapthing = p.uimap(thefunction, listofmats)
+        mapthing = p.imap_unordered(thefunction, listofmats)
         pcfactor = 100 / len(listofmats)
         oldpc = 0
         pc = 0
