@@ -21,15 +21,20 @@ def importer(extras, testing=False):
     import multiprocess
     from functools import partial
     from lib.operations import operator
-    np.seterr(all='raise')
+    from tinydb.storages import JSONStorage
+    from tinydb.middlewares import CachingMiddleware
+    np.warnings.filterwarnings('ignore')
+    np.seterr(all='ignore')
 
     def submitchanged(thang):
         table.update(thang, doc_ids=[thang.doc_id, ])
 
-    noncore = TinyDB('./dbs/non_Core.json',)
-    MATs = TinyDB('./dbs/MATS.json')
-    core = TinyDB('./dbs/Core.json')
-    district = TinyDB('./dbs/district.json')
+    CachingStorage = CachingMiddleware
+    CachingStorage.WRITE_CACHE_SIZE = 100
+    noncore = TinyDB('./dbs/non_Core.json', storage=CachingStorage(JSONStorage))
+    MATs = TinyDB('./dbs/MATS.json', storage=CachingStorage(JSONStorage))
+    core = TinyDB('./dbs/Core.json', storage=CachingStorage(JSONStorage))
+    district = TinyDB('./dbs/district.json', storage=CachingStorage(JSONStorage))
 
     tablestring = '|'.join(x for x in extras)
     if testing:
@@ -64,6 +69,7 @@ def importer(extras, testing=False):
                     raw = csv.DictReader(openfile, delimiter=',')
                     dicts = [dict(row) for row in raw]
                     maxthing = len(dicts)
+                    tablemap = {}
                     for i, x in enumerate(dicts):
                         urn = x['URN']
                         urns.append(urn)
@@ -71,12 +77,11 @@ def importer(extras, testing=False):
                         if type(Mat_in) == int:
                             Mat_in = [Mat_in, ]
                         try:
-                            search = table.search(Query()['Trust name'] == x[defs.MatNameKey])
-                            Mat_in.extend([x for x in search[0]['IDs']])
-                            Matid = search[0].doc_id
-                        except IndexError:
-                            table.insert({"Trust name": x[defs.MatNameKey],
-                                          "IDs": list(set(Mat_in))})
+                            Matid = tablemap[x[defs.MatNameKey]]
+                            search = table.get(doc_id=Matid)
+                            Mat_in.extend([x for x in search['IDs']])
+                        except KeyError:
+                            tablemap[x[defs.MatNameKey]] = table.insert({"Trust name": x[defs.MatNameKey], "IDs": list(set(Mat_in))})
                         else:
                             table.update({"Trust name": x[defs.MatNameKey], "IDs": list(set(Mat_in))},
                                          doc_ids=[Matid, ])

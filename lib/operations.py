@@ -1,5 +1,7 @@
 def operator(key, operation):
     import numpy as np
+    np.warnings.filterwarnings('ignore')
+    np.seterr(all='raise')
     from collections import Counter
     if operation == 'avg':
         def avg(x, key, dbs):
