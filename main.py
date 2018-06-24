@@ -38,7 +38,7 @@ def silentremove(filename):
 
 
 # Gooey automatically generates a GUI
-@Gooey(program_name='MATSimCheck', image_dir='lib/img', monospace_display=True, progress_regex=r"^.+ is (\d+)% done$")
+@Gooey(program_name='MATSimCheck', image_dir='img', monospace_display=True, progress_regex=r"^.+ is (\d+)% done$")
 def main():
     # Open the databases
     noncore = TinyDB('./dbs/non_Core.json')

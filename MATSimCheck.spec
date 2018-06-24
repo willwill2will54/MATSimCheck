@@ -13,7 +13,7 @@ gooey_images = Tree(os.path.join(gooey_root, 'images'), prefix = 'gooey/images')
 a = Analysis(['main.py'],
              pathex=['lib', '.', '~/Documents/GitHub/MATSimCheck', '/home/will/.local/bin', '/usr/lib/python3.5', '/home/will/.local/lib/python3.5/site-packages', '/usr/lib/python3/dist-packages'],
              binaries=[],
-             datas=[('dbs', 'dbs'), ('Core', 'Core'), ('special', 'special'), ('non_Core', 'non_Core'), ('result.csv', 'result.csv'), ('defaults.py', 'defaults.py')],
+             datas=[('dbs', 'dbs'), ('Core', 'Core'), ('special', 'special'), ('non_Core', 'non_Core'), ('result.csv', 'result.csv'), ('defaults.py', 'defaults.py'), ('img', 'img')],
              hiddenimports=[],
              hookspath=[],
              runtime_hooks=[],
