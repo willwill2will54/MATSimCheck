@@ -281,11 +281,10 @@ def importer(extras, testing=False):
         Messages.PROGRESS('Compiling Variables', pc)
         for i, thang in enumerate(mapthing):
             result, corechanged = thang[0], thang[1]
-            task = p.apply_async(submitchanged, args=(result, ))
+            submitchanged(result)
             for changed in corechanged:
                 dbs['core'].update(changed, doc_ids=[changed.doc_id, ])
             pc = round((i + 1) * pcfactor)
-            task.wait()
             if pc != oldpc:
                 Messages.PROGRESS('Compiling Variables', pc)
             oldpc = pc
