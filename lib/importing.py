@@ -13,18 +13,22 @@ def _running(dbs, funcs, mat):
 
 def importer(extras, testing=False):
     import lib.messages as Messages
-    from tinydb import TinyDB, Query
-    import numpy as np
     from lib.misc import getpostcodes
-    import defaults as defs
-    from os import listdir
-    import multiprocess
-    from functools import partial
     from lib.operations import operator
+    import defaults as defs
+    import cProfile
+
+    import pickle
+    import multiprocess
+    import numpy as np
+    from os import listdir
+    from functools import partial
+    from tinydb import TinyDB, Query
     from tinydb.storages import JSONStorage
     from tinydb.middlewares import CachingMiddleware
+
     np.warnings.filterwarnings('ignore')
-    np.seterr(all='ignore')
+    np.seterr(all='raise')
 
     def submitchanged(thang):
         table.update(thang, doc_ids=[thang.doc_id, ])
@@ -70,24 +74,44 @@ def importer(extras, testing=False):
                     dicts = [dict(row) for row in raw]
                     maxthing = len(dicts)
                     tablemap = {}
-                    for i, x in enumerate(dicts):
-                        urn = x['URN']
-                        urns.append(urn)
-                        Mat_in = core.upsert(x, Query().URN == urn)
-                        if type(Mat_in) == int:
-                            Mat_in = [Mat_in, ]
-                        try:
-                            Matid = tablemap[x[defs.MatNameKey]]
-                            search = table.get(doc_id=Matid)
-                            Mat_in.extend([x for x in search['IDs']])
-                        except KeyError:
-                            tablemap[x[defs.MatNameKey]] = table.insert({"Trust name": x[defs.MatNameKey], "IDs": list(set(Mat_in))})
-                        else:
-                            table.update({"Trust name": x[defs.MatNameKey], "IDs": list(set(Mat_in))},
-                                         doc_ids=[Matid, ])
+                    try:
+                        with open("./dbs/urns.pickle", "rb") as f:
+                            urns = pickle.load(f)
+                    except Exception:
+                        urns = {}
+                    pr = cProfile.Profile()
+                    pr.enable()
+                    try:
+                        for i, x in enumerate(dicts):
+                            urn = x['URN']
+                            if urn not in urns:
+                                sid = core.insert(x)
+                                urns[urn] = sid
+                            else:
+                                sid = urns[urn]
+                            if type(sid) == int:
+                                sid = [sid, ]
+                            if x[defs.MatNameKey] in tablemap:
+                                tablemap[x[defs.MatNameKey]]['IDs'] += sid
+                            else:
+                                tablemap[x[defs.MatNameKey]] = {"Trust name": x[defs.MatNameKey], "IDs": sid}
+                            pc = int(((i + 1) / maxthing) * 100)
+                            if pc != lastpc:
+                                Messages.PROGRESS('Initialising school database', pc)
+                                lastpc = pc
+                    except KeyboardInterrupt:
+                        pass
+                    finally:
+                        pr.disable()
+                        pr.dump_stats('profile.out')
+                    with open("./dbs/urns.pickle", "wb") as f:
+                        pickle.dump(urns, f)
+                    maxthing = len(tablemap)
+                    for i, x in enumerate(tablemap.values()):
+                        table.upsert(x, Query()["Trust name"] == x["Trust name"])
                         pc = int(((i + 1) / maxthing) * 100)
                         if pc != lastpc:
-                            Messages.PROGRESS('Initialising school database', pc)
+                            Messages.PROGRESS('Saving school database', pc)
                             lastpc = pc
                     break
             except UnicodeError:
@@ -238,7 +262,7 @@ def importer(extras, testing=False):
     dictdbs = {'district': districtdict, 'core': coredict}
     listofmats = dbs['table'].all()
 
-    with multiprocess.Pool() as p:
+    with multiprocess.Pool(processes=defs.threadcount) as p:
         funcs = []
         for x, y in process:
             if (x, y) == ('geo', 'rmsd'):
@@ -257,10 +281,11 @@ def importer(extras, testing=False):
         Messages.PROGRESS('Compiling Variables', pc)
         for i, thang in enumerate(mapthing):
             result, corechanged = thang[0], thang[1]
-            submitchanged(result)
+            task = p.apply_async(submitchanged, args=(result, ))
             for changed in corechanged:
                 dbs['core'].update(changed, doc_ids=[changed.doc_id, ])
             pc = round((i + 1) * pcfactor)
+            task.wait()
             if pc != oldpc:
                 Messages.PROGRESS('Compiling Variables', pc)
             oldpc = pc

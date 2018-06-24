@@ -1,10 +1,12 @@
+#! /usr/bin/python
 # Python modules, built-in
 import sys
 import random
 import csv
 import os
 import itertools
-import multiprocessing
+import multiprocess
+import errno
 from shlex import split as shlexsplit
 from itertools import product
 from collections import Counter
@@ -25,6 +27,15 @@ if _2 is not '':
     os.chdir(_2)
 
 sys.setrecursionlimit(1500)
+
+
+def silentremove(filename):
+    try:
+        os.remove(filename)
+    except OSError as e:
+        if e.errno != errno.ENOENT:
+            raise
+
 
 # Gooey automatically generates a GUI
 @Gooey(program_name='MATSimCheck', image_dir='lib/img', monospace_display=True, progress_regex=r"^.+ is (\d+)% done$")
@@ -81,6 +92,7 @@ Splits this many of the MATs into 2.''')
         for x in [core, noncore, counties, MATs]:
             x.purge()
         MATs.purge_tables()
+        silentremove('./dbs/urns.pickle')
         msg.DONE()
 
     if args.action == 'Display':
@@ -97,7 +109,7 @@ Splits this many of the MATs into 2.''')
                 importkeys += [a, b]
             table = importer(importkeys, testing=testing)[0]
             retresults = []
-            with multiprocessing.Pool() as pool:
+            with multiprocess.Pool(processes=defs.threadcount) as pool:
                 partthing = partial(tester, table, algorithm=algorithm, number=num, testing=testing)
                 for result in pool.imap_unordered(partthing, tested):
                     print('{} is most similar to {}\n'.format(result[2], ' then '.join(result[0])), flush=True)
@@ -161,6 +173,9 @@ Splits this many of the MATs into 2.''')
     def experimentalfunc():
         testeds = testprep(args.plural)
         go = 0
+        if os.path.isfile('./dbs/urns.pickle'):
+            renamed = True
+            os.rename('./dbs/urns.pickle', './dbs/urns.temppickle')
         ensure_dir('special/testresults/result.csv')
         with open('special/testresults/result.csv', 'w', encoding='utf-16') as resultsfile:
             writer = csv.DictWriter(resultsfile, fieldnames=['a', 'b', 'c', 'd', 'e', 'position', 'score', 'MAT'])
@@ -190,6 +205,9 @@ Splits this many of the MATs into 2.''')
                     if done:
                         dictstobewritten.append(dicttobewritten)
             writer.writerows(dictstobewritten)
+        os.remove('./dbs/urns.pickle')
+        if renamed:
+            os.rename('./dbs/urns.temppickle', './dbs/urns.pickle')
 
         print('\a')
 
