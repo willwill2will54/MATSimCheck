@@ -1,4 +1,4 @@
-import multiprocessing
+import multiprocess
 
 algorithm = [
     'trust', 'size', 'wgt', '1',
@@ -17,7 +17,7 @@ PostCodeKey = 'Postcode'
 ApiURL = 'http://postcodes.io/postcodes/'
 
 
-threadcount = multiprocessing.cpu_count()
+threadcount = multiprocess.cpu_count()
 
 
 TestAlgorithmVariables = (range(4), ) * 5

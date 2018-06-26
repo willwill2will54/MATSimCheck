@@ -4,9 +4,11 @@ def tester(table, MAT, algorithm=['geormsd', 'wgt', '500'], number=None, testing
     from pprint import pprint
     import defaults as defs
     import numpy as np
+    from tinydb.storages import JSONStorage
+    from tinydb.middlewares import CachingMiddleware
 
-    MATs = TinyDB('./dbs/MATS.json')
-    core = TinyDB('./dbs/Core.json')
+    MATs = TinyDB('./dbs/MATS.json', storage=CachingMiddleware(JSONStorage))
+    core = TinyDB('./dbs/Core.json', storage=CachingMiddleware(JSONStorage))
     tab = MATs.table(table)
     cand = tab.all()
     tested = tab.get(Query()['Trust name'] == MAT)

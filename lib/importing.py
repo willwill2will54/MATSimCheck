@@ -89,6 +89,7 @@ def importer(extras, testing=False):
                                 urns[urn] = sid
                             else:
                                 sid = urns[urn]
+                                core.update(x, doc_ids=sid)
                             if type(sid) == int:
                                 sid = [sid, ]
                             if x[defs.MatNameKey] in tablemap:
@@ -134,12 +135,14 @@ def importer(extras, testing=False):
                     for i, x in enumerate(dicts):
                         urn = x['URN']
                         keys.update(set(x.keys()))
+                        to_delete = set(x.keys()).difference(extras2)
+                        for d in to_delete:
+                            del x[d]
                         if urn in urns:
-                            to_delete = set(x.keys()).difference(extras2)
-                            for d in to_delete:
-                                del x[d]
                             noncore.upsert(x, Query().URN == urn)
                             core.update(x, Query().URN == urn)
+                        else:
+                            core.update(x, doc_ids=sid)
                         pc = int(((i + 1) / maxthing) * 100)
                         if pc != lastpc:
                             Messages.PROGRESS('This', pc)
