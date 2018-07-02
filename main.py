@@ -173,6 +173,7 @@ Splits this many of the MATs into 2.''')
     def experimentalfunc():
         testeds = testprep(args.plural)
         go = 0
+        renamed = False
         if os.path.isfile('./dbs/urns.pickle'):
             renamed = True
             os.rename('./dbs/urns.pickle', './dbs/urns.temppickle')
@@ -198,8 +199,8 @@ Splits this many of the MATs into 2.''')
                     done = False
                     for pos, thing in enumerate(resulthing[1]):
                         if thing[0].startswith(resulthing[0][:-1]) and thing[0].endswith('2'):
-                            dicttobewritten = {'a': var[0], 'b': var[1], 'c': var[2], 'd': var[3], 'e': var[4],
-                                               'position': pos, 'score': thing[1], 'MAT': thing[0]}
+                            dicttobewritten = {str(i): z for i, z in enumerate(var)}
+                            dicttobewritten += {'position': pos, 'score': thing[1], 'MAT': thing[0]}
                             done = True
                             break
                     if done:

@@ -15,3 +15,8 @@ dbs/Core.json
 dbs/Counties.json
 dbs/MATS.json
 dbs/non_Core.json
+.python-version
+.DS_Store
+build/MATSimCheck/out01-Tree.toc
+build/MATSimCheck/out00-Tree.toc
+build/MATSimCheck/base_library.zip

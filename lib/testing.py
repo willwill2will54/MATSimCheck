@@ -82,8 +82,9 @@ then try again if you want to use this variable.'.format(key), flush=True)
                     except KeyError as e:
                         x['sims'] += float(value)
                         errorcount += 1
-                        print('Weight exception: {} not found ({}/{})'.format(e, errorcount, len(cand)), flush=True)
                     donecand.append(dict(x))
+                if errorcount > 0:
+                    print('Weight exception: \'{}\' not found ({}/{})'.format(key, errorcount, len(cand)), flush=True)
                 cand = donecand[:]
 
         except KeyError:
@@ -110,6 +111,8 @@ then try again if you want to use this variable.'.format(key), flush=True)
                 for y, z in school.items():
                     if y in defs.ProgressScoreHeaders:
                         dict1[y].append(float(z))
+                    else:
+                        pass
         for ID in tested['IDs']:
             school = core.get(doc_id=ID)
             for y, z in school.items():

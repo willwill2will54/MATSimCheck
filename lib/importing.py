@@ -86,12 +86,14 @@ def importer(extras, testing=False):
                             urn = x['URN']
                             if urn not in urns:
                                 sid = core.insert(x)
+                                if type(sid) == int:
+                                    sid = [sid, ]
                                 urns[urn] = sid
                             else:
                                 sid = urns[urn]
+                                if type(sid) == int:
+                                    sid = [sid, ]
                                 core.update(x, doc_ids=sid)
-                            if type(sid) == int:
-                                sid = [sid, ]
                             if x[defs.MatNameKey] in tablemap:
                                 tablemap[x[defs.MatNameKey]]['IDs'] += sid
                             else:
@@ -114,9 +116,10 @@ def importer(extras, testing=False):
                         if pc != lastpc:
                             Messages.PROGRESS('Saving school database', pc)
                             lastpc = pc
-                    break
             except UnicodeError:
                 pass
+            else:
+                break
         Messages.PROGRESS('This', 100)
     len2 = len([each for each in listdir(noncoredir) if each.endswith('.csv')])
     Messages.IMPORT('non-core')
@@ -142,14 +145,15 @@ def importer(extras, testing=False):
                             noncore.upsert(x, Query().URN == urn)
                             core.update(x, Query().URN == urn)
                         else:
-                            core.update(x, doc_ids=sid)
+                            core.upsert(x, Query().URN == urn)
                         pc = int(((i + 1) / maxthing) * 100)
                         if pc != lastpc:
                             Messages.PROGRESS('This', pc)
                             lastpc = pc
-                        break
             except UnicodeError:
                 pass
+            else:
+                break
         Messages.PROGRESS('This', 100)
     with open('./special/HousePrices.csv') as openfile:
         raw = csv.DictReader(openfile, delimiter=',')
@@ -294,7 +298,6 @@ def importer(extras, testing=False):
 
     for x in [noncore, MATs, core, district]:
         x.close()
-    Messages.ALERT()
     return (tablestring, False)
 
 

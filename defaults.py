@@ -1,13 +1,9 @@
 import multiprocess
 
 algorithm = [
-    'trust', 'size', 'wgt', '1',
-    'geo', 'rmsd', 'wgt', '1',
-    'houseprice', 'avg', 'wgt', '1',
-    'StatutoryLowAge', 'avg', 'wgt', '1',
-    'StatutoryLowAge', 'rmsd', 'wgt', '1',
-    'StatutoryHighAge', 'avg', 'wgt', '1',
-    'StatutoryHighAge', 'rmsd', 'wgt', '1']
+    'trust', 'size', 'wgt', '3',
+    'geo', 'rmsd', 'wgt', '2',
+    'houseprice', 'avg', 'wgt', '1']
 CoreDirectory = './Core'
 NonCoreDirectory = './non_Core'
 MatNameKey = 'Trusts (name)'
@@ -19,10 +15,11 @@ ApiURL = 'http://postcodes.io/postcodes/'
 
 threadcount = multiprocess.cpu_count()
 
-
+# List of tuples, the whose constituents' permutations will be submitted as the parameter to TestAlgorithmMaker
 TestAlgorithmVariables = (range(4), ) * 5
 
 
+# Possible members of you algorithm with the weight being an itemp of the parameter
 def TestAlgorithmMaker(variables):
     algorithm = [
         'trust', 'size', 'wgt', str(variables[0]),
