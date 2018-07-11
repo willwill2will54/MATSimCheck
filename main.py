@@ -79,7 +79,7 @@ def main():
     test = subparsers.add_parser('Test', help='''\
         Runs Testing Utililty''')
 
-    can.add_argument('--multi', '-m', type=int, default=10, metavar='x', help='''\
+    can.add_argument('--multi', '-m', type=int, default=50, metavar='x', help='''\
         Displays x most similar MATs''')
     test.add_argument('--plural', '-p', type=int, default=20, metavar='x', help='''\
 Splits this many of the MATs into 2.''')
@@ -104,6 +104,7 @@ Splits this many of the MATs into 2.''')
         if algorithm in (None, ['defaults', ], 'defaults'):
             algorithm = defs.algorithm
         if tested is not None:
+            chain = itertools.chain.from_iterable
             importkeys = []
             for a, b in zip(algorithm[:-3:4], algorithm[1:-2:4]):
                 importkeys += [a, b]
@@ -111,7 +112,13 @@ Splits this many of the MATs into 2.''')
             retresults = []
             with multiprocess.Pool(processes=defs.threadcount) as pool:
                 partthing = partial(tester, table, algorithm=algorithm, number=num, testing=testing)
-                for result in pool.imap_unordered(partthing, tested):
+                if len(tested) > 1:
+                    first = [partthing(tested.pop() go=0), ]
+                    partthing = partial(tester, table, algorithm=algorithm, number=num, testing=testing, go=1)
+                else:
+                    first = []
+
+                for result in chain(first, pool.imap_unordered(partthing, tested)):
                     print('{} is most similar to {}\n'.format(result[2], ' then '.join(result[0])), flush=True)
                     retresults.append((result[2], result[1]))
             if testing:
@@ -119,7 +126,6 @@ Splits this many of the MATs into 2.''')
             else:
                 with open('result.csv', 'w', encoding='utf-16') as resultsfile:
                     print('Writing results to file...', flush=True)
-                    chain = itertools.chain.from_iterable
                     fields = sorted(list(chain(['Average ' + x, 'Subject ' + x] for x in defs.ProgressScoreHeaders)))
                     writer = csv.DictWriter(resultsfile, fieldnames=['MAT', ] + fields)
                     writer.writeheader()

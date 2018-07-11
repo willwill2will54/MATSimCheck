@@ -1,4 +1,4 @@
-def tester(table, MAT, algorithm=['geormsd', 'wgt', '500'], number=None, testing=False):
+def tester(table, MAT, algorithm=['geormsd', 'wgt', '500'], number=None, testing=False, go=1):
     from collections import Counter
     from tinydb import TinyDB, Query
     from pprint import pprint
@@ -83,7 +83,7 @@ then try again if you want to use this variable.'.format(key), flush=True)
                         x['sims'] += float(value)
                         errorcount += 1
                     donecand.append(dict(x))
-                if errorcount > 0:
+                if errorcount > 0 and go == 0:
                     print('Weight exception: \'{}\' not found ({}/{})'.format(key, errorcount, len(cand)), flush=True)
                 cand = donecand[:]
 
@@ -104,15 +104,13 @@ then try again if you want to use this variable.'.format(key), flush=True)
         lastthing = finlist
     else:
         dict1 = {x: [] for x in defs.ProgressScoreHeaders}
-        dict2 = dict(dict1)
+        dict2 = {x: [] for x in defs.ProgressScoreHeaders}
         for x in finlist[:number]:
             for ID in next(item for item in counterpack if item['Trust name'] == x[0])['IDs']:
                 school = core.get(doc_id=ID)
                 for y, z in school.items():
                     if y in defs.ProgressScoreHeaders:
                         dict1[y].append(float(z))
-                    else:
-                        pass
         for ID in tested['IDs']:
             school = core.get(doc_id=ID)
             for y, z in school.items():
